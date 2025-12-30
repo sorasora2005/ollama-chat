@@ -34,7 +34,9 @@ https://github.com/user-attachments/assets/fece7952-e622-4130-ac67-d214fdbc16b3
 - 💬 **チャット履歴の保存** - PostgreSQLによる永続的なチャット履歴管理
 - 📄 **マルチファイル対応** - PDF、PNG/JPG、TXT、XLSX、DOCXファイルのアップロードと変換
 - 🎨 **Gemini風の洗練されたUI** - モダンで使いやすいインターフェース
-- 🔄 **幅広いモデル対応** - Ollamaで利用可能なほぼすべてのモデルをサポート（テキストモデル、画像認識モデル、コード生成モデルなど）
+- 🔄 **幅広いモデル対応** - Ollamaで利用可能なほぼすべてのモデルをサポート
+- ☁️ **クラウドAPI対応** - GeminiやGPTなどのクラウドモデルのAPIキーを登録して利用可能
+- 📝 **ノート機能** - チャット内容やアイデアをノートとして保存・管理・検索
 - 👥 **マルチユーザー対応** - 複数のユーザーアカウント管理
 - 📁 **セッション管理** - チャットセッションの作成、削除、検索機能
 - 🔍 **検索機能** - チャット履歴の全文検索
@@ -167,6 +169,8 @@ start.bat
 ### 高度な機能
 
 - **モデル管理**: モデルセレクターからモデルのダウンロード、削除が可能
+- **クラウドモデル連携**: モデルセレクターからGeminiなどクラウドモデル用のAPIキーを登録・管理し、チャットで利用可能
+- **ノート機能**: `/notes` ページでチャット内容やアイデアをノートとして保存、閲覧、検索
 - **ファイル管理**: `/files` ページでアップロードしたファイルの一覧を確認
 - **ユーザー切り替え**: ログアウトして別のユーザーでログイン可能
 - **メッセージ生成の中断**: ストリーミング中に生成をキャンセルし、キャンセルされたメッセージは視覚的に区別されます
@@ -220,11 +224,13 @@ start.bat
 │  (FastAPI)  │
 │             │
 │  - Routers  │
+│    ├── api_keys.py│
 │    ├── chat.py    │
+│    ├── feedback.py│
 │    ├── models.py  │
+│    ├── notes.py   │
 │    ├── upload.py  │
-│    ├── users.py   │
-│    └── feedback.py│
+│    └── users.py   │
 └──────┬──────┘
        │
        ├───► PostgreSQL (Port 5432)
@@ -233,6 +239,8 @@ start.bat
        │     - セッション管理
        │     - ファイルメタデータ
        │     - メッセージフィードバック
+       │     - ノート
+       │     - クラウドAPIキー
        │
        └───► Ollama (Port 11434)
              - AIモデル実行
@@ -246,20 +254,25 @@ start.bat
 - **カスタムフック**: ビジネスロジックをカスタムフックに分離（`hooks/`）
   - `useChat`: チャット履歴とセッション管理
   - `useChatMessage`: メッセージ送信とストリーミング処理
-  - `useModels`: モデル一覧と選択管理
+  - `useCloudApiKeys`: クラウドAPIキーの管理
   - `useFiles`: ファイル管理
+  - `useModelDownload`: モデルのダウンロード管理
+  - `useModels`: モデル一覧と選択管理
+  - `useNotifications`: 通知（トースト）管理
+  - `useTheme`: テーマ（ダーク/ライトモード）管理
   - `useUsers`: ユーザー管理
-  - その他、テーマ、通知、モデルダウンロードなどの機能別フック
 - **ユーティリティ**: APIクライアント、エクスポート、スクロールなどの共通処理（`utils/`）
 - **型定義**: TypeScript型定義を一元管理（`types/`）
 
 **バックエンド**:
 - **ルーター分離**: APIエンドポイントを機能別に分離（`routers/`）
+  - `api_keys.py`: クラウドAPIキー管理API
   - `chat.py`: チャット関連API（トークン数の記録を含む）
+  - `feedback.py`: フィードバック送信と統計情報API
   - `models.py`: モデル管理API
+  - `notes.py`: ノート管理API
   - `upload.py`: ファイルアップロードAPI
   - `users.py`: ユーザー管理API
-  - `feedback.py`: フィードバック送信と統計情報API
 - **モジュール化**: 各ルーターが独立して管理され、`main.py`で統合
 
 ## 対応ファイル形式
@@ -318,11 +331,13 @@ ollama-chat/
 │   ├── requirements.txt    # Python依存関係
 │   ├── Dockerfile          # バックエンドDockerfile
 │   ├── routers/            # APIルーター（機能別に分離）
+│   │   ├── api_keys.py    # クラウドAPIキー管理エンドポイント
 │   │   ├── chat.py        # チャット関連エンドポイント
+│   │   ├── feedback.py    # フィードバック関連エンドポイント
 │   │   ├── models.py      # モデル管理エンドポイント
+│   │   ├── notes.py       # ノート管理エンドポイント
 │   │   ├── upload.py      # ファイルアップロードエンドポイント
-│   │   ├── users.py       # ユーザー管理エンドポイント
-│   │   └── feedback.py    # フィードバック関連エンドポイント
+│   │   └── users.py       # ユーザー管理エンドポイント
 │   ├── utils/             # ユーティリティ関数
 │   │   └── model_utils.py # モデル関連ユーティリティ
 │   └── alembic/           # データベースマイグレーション
@@ -334,6 +349,7 @@ ollama-chat/
 │   │   ├── icon.png        # アプリケーションアイコン
 │   │   ├── apple-icon.png  # Apple用アイコン
 │   │   ├── components/     # Reactコンポーネント（機能別に分離）
+│   │   │   ├── CloudModelFamily.tsx
 │   │   │   ├── DeleteConfirmModal.tsx
 │   │   │   ├── DownloadSuccessModal.tsx
 │   │   │   ├── DownloadWarningModal.tsx
@@ -341,8 +357,13 @@ ollama-chat/
 │   │   │   ├── FilePreviewModal.tsx
 │   │   │   ├── MessageInput.tsx
 │   │   │   ├── MessageList.tsx
+│   │   │   ├── ModelList.tsx
 │   │   │   ├── ModelSelector.tsx
 │   │   │   ├── ModelStatsModal.tsx
+│   │   │   ├── NoteCreateModal.tsx
+│   │   │   ├── NoteDetailModal.tsx
+│   │   │   ├── NoteList.tsx
+│   │   │   ├── NoteSearchModal.tsx
 │   │   │   ├── NotificationToast.tsx
 │   │   │   ├── SearchModal.tsx
 │   │   │   ├── Sidebar.tsx
@@ -353,6 +374,7 @@ ollama-chat/
 │   │   ├── hooks/          # カスタムフック（ロジックの分離）
 │   │   │   ├── useChat.ts
 │   │   │   ├── useChatMessage.ts
+│   │   │   ├── useCloudApiKeys.ts
 │   │   │   ├── useFiles.ts
 │   │   │   ├── useModelDownload.ts
 │   │   │   ├── useModels.ts
@@ -367,6 +389,8 @@ ollama-chat/
 │   │   ├── types/          # TypeScript型定義
 │   │   │   └── index.ts
 │   │   ├── files/          # ファイル管理ページ
+│   │   │   └── page.tsx
+│   │   ├── notes/          # ノート管理ページ
 │   │   │   └── page.tsx
 │   │   └── stats/          # 統計情報ページ
 │   │       └── page.tsx
