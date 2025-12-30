@@ -147,5 +147,12 @@ export const api = {
     const response = await axios.get(`${API_URL}/api/notes/detail/${noteId}`)
     return response.data
   },
+
+  searchNotes: async (userId: number, query: string): Promise<Note[]> => {
+    const response = await axios.get(`${API_URL}/api/notes/search/${userId}`, {
+      params: { q: query.trim() }
+    })
+    return response.data.results || []
+  },
 }
 

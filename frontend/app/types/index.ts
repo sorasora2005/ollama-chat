@@ -55,5 +55,6 @@ export interface Note {
   model: string
   prompt: string
   created_at: string
+  snippet?: string  // For search results
 }
 

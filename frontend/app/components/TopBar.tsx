@@ -1,4 +1,4 @@
-import { Menu, Download, ChevronDown, BookOpen, Loader2, X } from 'lucide-react'
+import { Menu, Download, ChevronDown, BookOpen, Loader2, X, Search } from 'lucide-react'
 import ModelSelector from './ModelSelector'
 import { Model } from '../types'
 
@@ -22,6 +22,8 @@ interface TopBarProps {
   onExportChatHistory: () => void
   onCreateNewChat: () => void
   onCreateNote?: () => void
+  onShowNoteSearch?: () => void
+  pathname?: string
 }
 
 export default function TopBar({
@@ -44,6 +46,8 @@ export default function TopBar({
   onExportChatHistory,
   onCreateNewChat,
   onCreateNote,
+  onShowNoteSearch,
+  pathname,
 }: TopBarProps) {
   return (
     <div className="h-14 border-b border-gray-300 dark:border-gray-800 flex items-center justify-between px-4">
@@ -88,6 +92,16 @@ export default function TopBar({
               </div>
             ))}
           </div>
+        )}
+        {/* Note Search Button - Show on notes page */}
+        {pathname === '/notes' && onShowNoteSearch && (
+          <button
+            onClick={onShowNoteSearch}
+            className="p-2 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
+            title="ノートを検索"
+          >
+            <Search className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+          </button>
         )}
         {/* Create Note Button */}
         {currentSessionId && messagesLength > 0 && onCreateNote && (

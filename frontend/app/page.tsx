@@ -20,6 +20,7 @@ import TopBar from './components/TopBar'
 import MessageList from './components/MessageList'
 import MessageInput from './components/MessageInput'
 import SearchModal from './components/SearchModal'
+import NoteSearchModal from './components/NoteSearchModal'
 import FilePreviewModal from './components/FilePreviewModal'
 import WelcomeScreen from './components/WelcomeScreen'
 import NotificationToast from './components/NotificationToast'
@@ -58,6 +59,11 @@ export default function Home() {
   const [loadingNotes, setLoadingNotes] = useState(false)
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [showNoteCreateModal, setShowNoteCreateModal] = useState(false)
+  const [noteSearchQuery, setNoteSearchQuery] = useState('')
+  const [noteSearchResults, setNoteSearchResults] = useState<Note[]>([])
+  const [noteSearchLoading, setNoteSearchLoading] = useState(false)
+  const [showNoteSearch, setShowNoteSearch] = useState(false)
+  const noteSearchInputRef = useRef<HTMLInputElement>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -246,6 +252,43 @@ export default function Home() {
       loadNotes()
     }
   }, [pathname, userId])
+
+  // Handle note search
+  const handleNoteSearch = async (query: string) => {
+    if (!userId || !query.trim()) {
+      setNoteSearchResults([])
+      return
+    }
+
+    setNoteSearchLoading(true)
+    try {
+      const results = await api.searchNotes(userId, query)
+      setNoteSearchResults(results)
+    } catch (error) {
+      console.error('Failed to search notes:', error)
+      setNoteSearchResults([])
+    } finally {
+      setNoteSearchLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!userId || pathname !== '/notes') return
+    const timeoutId = setTimeout(() => {
+      if (noteSearchQuery) {
+        handleNoteSearch(noteSearchQuery)
+      } else {
+        setNoteSearchResults([])
+      }
+    }, 300)
+    return () => clearTimeout(timeoutId)
+  }, [noteSearchQuery, userId, pathname])
+
+  useEffect(() => {
+    if (showNoteSearch && noteSearchInputRef.current) {
+      noteSearchInputRef.current.focus()
+    }
+  }, [showNoteSearch])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -572,6 +615,27 @@ export default function Home() {
         onLoadChatHistory={loadChatHistory}
       />
 
+      <NoteSearchModal
+        isOpen={showNoteSearch}
+        searchQuery={noteSearchQuery}
+        searchResults={noteSearchResults}
+        searchLoading={noteSearchLoading}
+        searchInputRef={noteSearchInputRef}
+        onSearchQueryChange={setNoteSearchQuery}
+        onClose={() => {
+          setShowNoteSearch(false)
+          setNoteSearchQuery('')
+        }}
+        onNoteClick={async (note) => {
+          try {
+            const latestNote = await api.getNoteDetail(note.id)
+            setSelectedNote(latestNote)
+          } catch (error: any) {
+            showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
+          }
+        }}
+      />
+
       <FilePreviewModal
         isOpen={!!selectedFile}
         filename={selectedFile?.filename || ''}
@@ -625,6 +689,8 @@ export default function Home() {
           onExportChatHistory={handleExportChatHistory}
           onCreateNewChat={handleCreateNewChat}
           onCreateNote={() => setShowNoteCreateModal(true)}
+          onShowNoteSearch={() => setShowNoteSearch(true)}
+          pathname={pathname}
         />
 
         {/* Messages Area */}

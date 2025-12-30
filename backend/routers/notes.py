@@ -192,3 +192,56 @@ async def get_note_detail(note_id: int, db: Session = Depends(get_db)):
         "created_at": note.created_at.isoformat()
     }
 
+
+@router.get("/search/{user_id}")
+async def search_notes(user_id: int, q: str, db: Session = Depends(get_db)):
+    """Search notes for a user"""
+    if not q or len(q.strip()) == 0:
+        return {"results": []}
+    
+    search_query = f"%{q.strip()}%"
+    
+    # Search in note title and content
+    matching_notes = db.query(Note).filter(
+        Note.user_id == user_id,
+        (Note.title.ilike(search_query) | Note.content.ilike(search_query))
+    ).order_by(Note.created_at.desc()).all()
+    
+    results = []
+    for note in matching_notes:
+        # Get matching snippet from content
+        snippet = ""
+        content_lower = note.content.lower()
+        query_lower = q.lower()
+        
+        # Try to find query in content
+        index = content_lower.find(query_lower)
+        if index >= 0:
+            start = max(0, index - 50)
+            end = min(len(note.content), index + len(q) + 50)
+            snippet = note.content[start:end]
+            if start > 0:
+                snippet = "..." + snippet
+            if end < len(note.content):
+                snippet = snippet + "..."
+        elif note.title.lower().find(query_lower) >= 0:
+            # If query found in title, use first part of content as snippet
+            snippet = note.content[:100] + "..." if len(note.content) > 100 else note.content
+        else:
+            # Fallback: use first part of content
+            snippet = note.content[:100] + "..." if len(note.content) > 100 else note.content
+        
+        results.append({
+            "id": note.id,
+            "user_id": note.user_id,
+            "session_id": note.session_id,
+            "title": note.title,
+            "snippet": snippet,
+            "content": note.content,
+            "model": note.model,
+            "prompt": note.prompt,
+            "created_at": note.created_at.isoformat()
+        })
+    
+    return {"results": results}
+
