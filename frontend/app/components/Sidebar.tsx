@@ -116,7 +116,7 @@ export default function Sidebar({
                   送信したファイルがありません
                 </div>
               ) : (
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide px-2">
                   {userFiles.slice(0, 3).map((file) => (
                     <button
                       key={file.message_id}

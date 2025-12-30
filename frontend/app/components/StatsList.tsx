@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, MessageSquare, ThumbsUp, ThumbsDown, TrendingUp } from 'lucide-react'
+import { BarChart3, MessageSquare, ThumbsUp, ThumbsDown, TrendingUp, Loader2 } from 'lucide-react'
 import { api } from '../utils/api'
 
 interface FeedbackStats {
@@ -79,7 +79,7 @@ export default function StatsList({ userId, username }: StatsListProps) {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <Loader2 className="w-8 h-8 text-gray-600 dark:text-gray-400 animate-spin" />
         </div>
       ) : stats.length === 0 ? (
         <div className="text-center py-20">

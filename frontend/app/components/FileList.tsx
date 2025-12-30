@@ -43,10 +43,10 @@ export default function FileList({ files, loading, onFileClick }: FileListProps)
               <button
                 key={file.message_id}
                 onClick={() => onFileClick(file.session_id)}
-                className="text-left bg-gray-100 dark:bg-[#2d2d2d] hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg overflow-hidden transition-colors border border-gray-300 dark:border-gray-700"
+                className="text-left bg-gray-100 dark:bg-[#2d2d2d] hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg overflow-hidden transition-colors border border-gray-300 dark:border-gray-700 aspect-square flex flex-col"
               >
                 {file.images && file.images.length > 0 ? (
-                  <div className="aspect-video w-full overflow-hidden bg-gray-800">
+                  <div className="flex-1 w-full overflow-hidden bg-gray-800">
                     <img
                       src={`data:image/png;base64,${file.images[0]}`}
                       alt={file.filename}
@@ -54,12 +54,11 @@ export default function FileList({ files, loading, onFileClick }: FileListProps)
                     />
                   </div>
                 ) : (
-                  <div className="aspect-video w-full flex items-center justify-center bg-gray-800">
+                  <div className="flex-1 w-full flex items-center justify-center bg-gray-800">
                     <FileText className={`w-12 h-12 ${iconColor}`} />
                   </div>
                 )}
-                <div className="p-3">
-                  <div className="text-sm font-medium text-black dark:text-white truncate mb-1">{file.filename}</div>
+                <div className="p-2 flex-shrink-0">
                   <div className="text-xs text-gray-600 dark:text-gray-500">
                     {file.images.length}枚 • {new Date(file.created_at).toLocaleDateString('ja-JP')}
                   </div>
