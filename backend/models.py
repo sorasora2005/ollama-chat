@@ -43,3 +43,17 @@ class MessageFeedback(Base):
     user = relationship("User")
     message = relationship("ChatMessage", back_populates="feedbacks")
 
+class Note(Base):
+    __tablename__ = "notes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    session_id = Column(String, index=True)  # Session ID for linking to chat
+    title = Column(String)  # Note title
+    content = Column(Text)  # Note content (generated summary)
+    model = Column(String, index=True)  # Model used to generate the note
+    prompt = Column(Text)  # User's prompt/instruction for note generation
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User")
+

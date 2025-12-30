@@ -1,4 +1,4 @@
-import { Message, ChatSession } from '../types'
+import { Message, ChatSession, Note } from '../types'
 
 // Convert UTC to JST (UTC+9)
 const toJST = (dateString?: string) => {
@@ -63,6 +63,48 @@ export const exportChatHistory = (
   const link = document.createElement('a')
   const dateStr = new Date().toISOString().split('T')[0]
   const filename = `chat_history_${dateStr}_${currentSessionId.slice(0, 8)}.md`
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+export const exportNote = (
+  note: Note,
+  username: string
+) => {
+  if (!note || !note.content) {
+    throw new Error('エクスポートするノートがありません')
+  }
+
+  // Generate markdown content
+  let markdown = `# ${note.title}\n\n`
+  markdown += `**ノートID:** ${note.id}\n`
+  markdown += `**セッションID:** ${note.session_id}\n`
+  markdown += `**モデル:** ${note.model}\n`
+  markdown += `**ユーザー:** ${username}\n`
+  markdown += `**作成日時:** ${toJST(note.created_at)}\n`
+  markdown += `**エクスポート日時:** ${toJST(new Date().toISOString())}\n\n`
+  
+  if (note.prompt) {
+    markdown += `## プロンプト\n\n`
+    markdown += `${note.prompt}\n\n`
+  }
+  
+  markdown += `---\n\n`
+  markdown += `## ノート内容\n\n`
+  markdown += `${note.content}\n\n`
+
+  // Create markdown blob
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+
+  // Create download link
+  const link = document.createElement('a')
+  const dateStr = new Date().toISOString().split('T')[0]
+  const filename = `note_${dateStr}_${note.id}.md`
   link.href = url
   link.download = filename
   document.body.appendChild(link)

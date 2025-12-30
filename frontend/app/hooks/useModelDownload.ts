@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { api } from '../utils/api'
 import { estimateModelSizeRange } from '../utils/modelSize'
 
@@ -7,7 +7,8 @@ export function useModelDownload(
   setDownloadingModels: React.Dispatch<React.SetStateAction<Set<string>>>,
   deletingModels: Set<string>,
   setDeletingModels: React.Dispatch<React.SetStateAction<Set<string>>>,
-  loadModels: () => Promise<void>
+  loadModels: () => Promise<void>,
+  showNotification?: (message: string, type?: 'success' | 'error' | 'info') => void
 ) {
   const [showDownloadWarning, setShowDownloadWarning] = useState(false)
   const [pendingDownloadModel, setPendingDownloadModel] = useState<string | null>(null)
@@ -16,6 +17,9 @@ export function useModelDownload(
   const [completedDownloadModel, setCompletedDownloadModel] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [pendingDeleteModel, setPendingDeleteModel] = useState<string | null>(null)
+  
+  // Store AbortControllers for each downloading model
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
 
   const downloadModel = async (modelName: string) => {
     if (downloadingModels.has(modelName)) return
@@ -53,9 +57,18 @@ export function useModelDownload(
   const startDownload = async (modelName: string) => {
     console.log('Starting download for model:', modelName)
     setDownloadingModels(prev => new Set(prev).add(modelName))
+    
+    // Create AbortController for this download
+    const abortController = new AbortController()
+    abortControllersRef.current.set(modelName, abortController)
+    
+    // Show notification when download starts
+    if (showNotification) {
+      showNotification(`${modelName}のダウンロードを開始しました`, 'info')
+    }
 
     try {
-      const response = await api.pullModel(modelName)
+      const response = await api.pullModel(modelName, abortController.signal)
       console.log('Download response status:', response.status)
 
       if (!response.ok) {
@@ -77,6 +90,13 @@ export function useModelDownload(
         const { done, value } = await reader.read()
         if (done) {
           console.log('Stream ended')
+          break
+        }
+        
+        // Check if download was cancelled
+        if (abortController.signal.aborted) {
+          console.log('Download cancelled')
+          reader.cancel()
           break
         }
 
@@ -129,14 +149,44 @@ export function useModelDownload(
         await loadModels()
       }
     } catch (error: any) {
-      console.error('Failed to download model:', error)
-      alert(`モデルのダウンロードに失敗しました: ${error.message || error}`)
+      // Don't show error if it was cancelled
+      if (error.name === 'AbortError' || abortController.signal.aborted) {
+        console.log('Download was cancelled')
+        if (showNotification) {
+          showNotification(`${modelName}のダウンロードをキャンセルしました`, 'info')
+        }
+      } else {
+        console.error('Failed to download model:', error)
+        if (showNotification) {
+          showNotification(`モデルのダウンロードに失敗しました: ${error.message || error}`, 'error')
+        } else {
+          alert(`モデルのダウンロードに失敗しました: ${error.message || error}`)
+        }
+      }
     } finally {
+      // Clean up AbortController
+      abortControllersRef.current.delete(modelName)
       setDownloadingModels(prev => {
         const newSet = new Set(prev)
         newSet.delete(modelName)
         return newSet
       })
+    }
+  }
+
+  const cancelDownload = (modelName: string) => {
+    const abortController = abortControllersRef.current.get(modelName)
+    if (abortController) {
+      abortController.abort()
+      abortControllersRef.current.delete(modelName)
+      setDownloadingModels(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(modelName)
+        return newSet
+      })
+      if (showNotification) {
+        showNotification(`${modelName}のダウンロードをキャンセルしました`, 'info')
+      }
     }
   }
 
@@ -186,6 +236,7 @@ export function useModelDownload(
     downloadModel,
     handleConfirmDownload,
     handleCancelDownload,
+    cancelDownload,
     deleteModel,
     handleConfirmDelete,
     handleCancelDelete,

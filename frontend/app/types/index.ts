@@ -46,3 +46,14 @@ export interface UserFile {
   model?: string
 }
 
+export interface Note {
+  id: number
+  user_id: number
+  session_id: string
+  title: string
+  content: string
+  model: string
+  prompt: string
+  created_at: string
+}
+

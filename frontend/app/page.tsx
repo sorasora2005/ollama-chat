@@ -12,7 +12,7 @@ import { useFiles } from './hooks/useFiles'
 import { useModelDownload } from './hooks/useModelDownload'
 import { useChatMessage } from './hooks/useChatMessage'
 import { useNotifications } from './hooks/useNotifications'
-import { exportChatHistory } from './utils/chatExport'
+import { exportChatHistory, exportNote } from './utils/chatExport'
 import { scrollToBottom } from './utils/scrollUtils'
 import UsernameModal from './components/UsernameModal'
 import Sidebar from './components/Sidebar'
@@ -29,7 +29,11 @@ import DeleteConfirmModal from './components/DeleteConfirmModal'
 import ModelStatsModal from './components/ModelStatsModal'
 import FileList from './components/FileList'
 import StatsList from './components/StatsList'
+import NoteList from './components/NoteList'
+import NoteCreateModal from './components/NoteCreateModal'
+import NoteDetailModal from './components/NoteDetailModal'
 import { api } from './utils/api'
+import { Note } from './types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -50,6 +54,10 @@ export default function Home() {
     conversation_count: number
   }> | null>(null)
   const [showModelStats, setShowModelStats] = useState(false)
+  const [notes, setNotes] = useState<Note[]>([])
+  const [loadingNotes, setLoadingNotes] = useState(false)
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+  const [showNoteCreateModal, setShowNoteCreateModal] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -123,6 +131,8 @@ export default function Home() {
     loadUserFiles,
   } = useFiles(userId)
 
+  const { notification, setNotification, showNotification } = useNotifications()
+
   const {
     showDownloadWarning,
     pendingDownloadModel,
@@ -134,6 +144,7 @@ export default function Home() {
     downloadModel,
     handleConfirmDownload,
     handleCancelDownload,
+    cancelDownload,
     deleteModel,
     handleConfirmDelete,
     handleCancelDelete,
@@ -144,7 +155,8 @@ export default function Home() {
     setDownloadingModels,
     deletingModels,
     setDeletingModels,
-    loadModels
+    loadModels,
+    showNotification
   )
 
   const {
@@ -172,8 +184,6 @@ export default function Home() {
     loadSessions,
     loadUserFiles
   )
-
-  const { notification, setNotification, showNotification } = useNotifications()
 
   // Initialize
   useEffect(() => {
@@ -213,6 +223,27 @@ export default function Home() {
   useEffect(() => {
     if (pathname === '/files' && userId && !loadingFiles) {
       loadUserFiles(userId)
+    }
+  }, [pathname, userId])
+
+  // Load notes when accessing /notes page
+  const loadNotes = async () => {
+    if (!userId) return
+    setLoadingNotes(true)
+    try {
+      const notesData = await api.getNotes(userId)
+      setNotes(notesData)
+    } catch (error: any) {
+      console.error('Failed to load notes:', error)
+      showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
+    } finally {
+      setLoadingNotes(false)
+    }
+  }
+
+  useEffect(() => {
+    if (pathname === '/notes' && userId && !loadingNotes) {
+      loadNotes()
     }
   }, [pathname, userId])
 
@@ -404,6 +435,47 @@ export default function Home() {
     }
   }
 
+  // Handle export note
+  const handleExportNote = (note: Note) => {
+    try {
+      exportNote(note, username)
+      showNotification('ノートをエクスポートしました', 'success')
+    } catch (error: any) {
+      showNotification(error.message || 'エクスポートするノートがありません', 'error')
+    }
+  }
+
+  // Handle create note
+  const handleCreateNote = async (model: string, prompt: string) => {
+    if (!userId || !currentSessionId) {
+      showNotification('ノートを作成するにはチャットセッションが必要です', 'error')
+      return
+    }
+
+    try {
+      await api.createNote({
+        user_id: userId,
+        session_id: currentSessionId,
+        model: model,
+        prompt: prompt,
+      })
+      showNotification('ノートを作成しました。生成中です...', 'success')
+      // Refresh notes if on notes page
+      if (pathname === '/notes') {
+        await loadNotes()
+      }
+      // Poll for note completion
+      setTimeout(async () => {
+        if (pathname === '/notes') {
+          await loadNotes()
+        }
+      }, 5000)
+    } catch (error: any) {
+      showNotification(`ノートの作成に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
+      throw error
+    }
+  }
+
   // Handle click outside model selector
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -470,6 +542,22 @@ export default function Home() {
         onCancel={handleCancelDelete}
       />
 
+      <NoteCreateModal
+        isOpen={showNoteCreateModal}
+        models={models}
+        selectedModel={selectedModel}
+        onClose={() => setShowNoteCreateModal(false)}
+        onCreateNote={handleCreateNote}
+      />
+
+      <NoteDetailModal
+        isOpen={!!selectedNote}
+        note={selectedNote}
+        onClose={() => setSelectedNote(null)}
+        onChatClick={loadChatHistory}
+        onExport={handleExportNote}
+      />
+
       <SearchModal
         isOpen={showSearch}
         searchQuery={searchQuery}
@@ -531,10 +619,12 @@ export default function Home() {
           onModelChange={handleModelChange}
           onDownloadModel={downloadModel}
           onDeleteModel={deleteModel}
+          onCancelDownload={cancelDownload}
           currentSessionId={currentSessionId}
           messagesLength={messages.length}
           onExportChatHistory={handleExportChatHistory}
           onCreateNewChat={handleCreateNewChat}
+          onCreateNote={() => setShowNoteCreateModal(true)}
         />
 
         {/* Messages Area */}
@@ -549,6 +639,21 @@ export default function Home() {
               files={userFiles}
               loading={loadingFiles}
               onFileClick={loadChatHistory}
+            />
+          ) : pathname === '/notes' ? (
+            <NoteList
+              notes={notes}
+              loading={loadingNotes}
+              onNoteClick={async (note) => {
+                // Fetch latest note detail
+                try {
+                  const latestNote = await api.getNoteDetail(note.id)
+                  setSelectedNote(latestNote)
+                } catch (error: any) {
+                  showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
+                }
+              }}
+              onChatClick={loadChatHistory}
             />
           ) : loadingHistory ? (
             <div className="max-w-3xl mx-auto w-full flex flex-col items-center justify-center flex-1">
@@ -574,7 +679,7 @@ export default function Home() {
           )}
         </div>
 
-        {pathname !== '/files' && pathname !== '/stats' && (
+        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && (
           <MessageInput
             input={input}
             uploading={uploading}

@@ -40,3 +40,19 @@ class FeedbackStatsResponse(BaseModel):
     user_id: int
     stats: List[dict]
 
+class NoteCreateRequest(BaseModel):
+    user_id: int
+    session_id: str
+    model: str
+    prompt: str
+
+class NoteResponse(BaseModel):
+    id: int
+    user_id: int
+    session_id: str
+    title: str
+    content: str
+    model: str
+    prompt: str
+    created_at: str
+

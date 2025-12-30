@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Message, Model, ChatSession, UserInfo, UserFile } from '../types'
+import { Message, Model, ChatSession, UserInfo, UserFile, Note } from '../types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -10,8 +10,10 @@ export const api = {
     return response.data.models || []
   },
 
-  pullModel: async (modelName: string): Promise<Response> => {
-    return fetch(`${API_URL}/api/models/pull/${encodeURIComponent(modelName)}`)
+  pullModel: async (modelName: string, signal?: AbortSignal): Promise<Response> => {
+    return fetch(`${API_URL}/api/models/pull/${encodeURIComponent(modelName)}`, {
+      signal,
+    })
   },
 
   deleteModel: async (modelName: string): Promise<void> => {
@@ -122,6 +124,27 @@ export const api = {
       ? `${API_URL}/api/feedback/stats/${userId}?model=${encodeURIComponent(model)}`
       : `${API_URL}/api/feedback/stats/${userId}`
     const response = await axios.get(url)
+    return response.data
+  },
+
+  // Notes
+  createNote: async (request: {
+    user_id: number
+    session_id: string
+    model: string
+    prompt: string
+  }): Promise<Note> => {
+    const response = await axios.post(`${API_URL}/api/notes`, request)
+    return response.data
+  },
+
+  getNotes: async (userId: number): Promise<Note[]> => {
+    const response = await axios.get(`${API_URL}/api/notes/${userId}`)
+    return response.data.notes || []
+  },
+
+  getNoteDetail: async (noteId: number): Promise<Note> => {
+    const response = await axios.get(`${API_URL}/api/notes/detail/${noteId}`)
     return response.data
   },
 }

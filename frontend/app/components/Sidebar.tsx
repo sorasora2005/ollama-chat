@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, Search, Plus, ChevronRight, LogOut, Sun, Moon, FileText, BarChart3 } from 'lucide-react'
+import { Menu, Search, Plus, ChevronRight, LogOut, Sun, Moon, FileText, BarChart3, BookOpen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ChatSession, UserFile } from '../types'
 
@@ -91,6 +91,17 @@ export default function Sidebar({
             >
               <BarChart3 className="w-5 h-5" />
               <span className="text-sm">統計情報</span>
+            </button>
+          </div>
+
+          {/* Notes Link */}
+          <div className="mb-4">
+            <button
+              onClick={() => router.push('/notes')}
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-200 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors text-black dark:text-white"
+            >
+              <BookOpen className="w-5 h-5" />
+              <span className="text-sm">ノート</span>
             </button>
           </div>
 
