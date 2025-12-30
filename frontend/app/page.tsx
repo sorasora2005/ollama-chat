@@ -574,23 +574,25 @@ export default function Home() {
           )}
         </div>
 
-        <MessageInput
-          input={input}
-          uploading={uploading}
-          uploadedFile={uploadedFile}
-          loading={loading || isStreaming}
-          userId={userId}
-          selectedModel={selectedModel}
-          supportsImages={supportsImages}
-          textareaRef={textareaRef}
-          fileInputRef={fileInputRef}
-          onInputChange={setInput}
-          onFileUpload={handleFileUpload}
-          onRemoveFile={() => setUploadedFile(null)}
-          onSend={handleSendWithFile}
-          onCancel={handleCancelStreaming}
-          onKeyPress={handleKeyPress}
-        />
+        {pathname !== '/files' && pathname !== '/stats' && (
+          <MessageInput
+            input={input}
+            uploading={uploading}
+            uploadedFile={uploadedFile}
+            loading={loading || isStreaming}
+            userId={userId}
+            selectedModel={selectedModel}
+            supportsImages={supportsImages}
+            textareaRef={textareaRef}
+            fileInputRef={fileInputRef}
+            onInputChange={setInput}
+            onFileUpload={handleFileUpload}
+            onRemoveFile={() => setUploadedFile(null)}
+            onSend={handleSendWithFile}
+            onCancel={handleCancelStreaming}
+            onKeyPress={handleKeyPress}
+          />
+        )}
       </div>
 
       <NotificationToast
