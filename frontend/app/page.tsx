@@ -31,6 +31,7 @@ import ModelStatsModal from './components/ModelStatsModal'
 import FileList from './components/FileList'
 import StatsList from './components/StatsList'
 import NoteList from './components/NoteList'
+import ModelList from './components/ModelList'
 import NoteCreateModal from './components/NoteCreateModal'
 import NoteDetailModal from './components/NoteDetailModal'
 import { api } from './utils/api'
@@ -678,11 +679,10 @@ export default function Home() {
           models={models}
           modelSearchQuery={modelSearchQuery}
           downloadingModels={downloadingModels}
-          deletingModels={deletingModels}
+          userId={userId}
           onModelSearchChange={setModelSearchQuery}
           onModelChange={handleModelChange}
           onDownloadModel={downloadModel}
-          onDeleteModel={deleteModel}
           onCancelDownload={cancelDownload}
           currentSessionId={currentSessionId}
           messagesLength={messages.length}
@@ -695,7 +695,9 @@ export default function Home() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col min-h-0">
-          {pathname === '/stats' ? (
+          {pathname === '/models' ? (
+            <ModelList userId={userId} />
+          ) : pathname === '/stats' ? (
             <StatsList
               userId={userId}
               username={username}
@@ -745,7 +747,7 @@ export default function Home() {
           )}
         </div>
 
-        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && (
+        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && (
           <MessageInput
             input={input}
             uploading={uploading}

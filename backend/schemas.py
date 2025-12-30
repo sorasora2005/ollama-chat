@@ -56,3 +56,23 @@ class NoteResponse(BaseModel):
     prompt: str
     created_at: str
 
+class CloudApiKeyCreate(BaseModel):
+    user_id: int
+    provider: str  # "gemini", "gpt", "grok", "claude"
+    api_key: str
+
+class CloudApiKeyResponse(BaseModel):
+    id: int
+    user_id: int
+    provider: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class CloudApiKeyTestRequest(BaseModel):
+    user_id: int
+    provider: str
+    api_key: str
+

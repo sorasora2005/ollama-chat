@@ -10,15 +10,205 @@ import uuid
 import asyncio
 
 from database import get_db
-from models import User, ChatMessage
+from models import User, ChatMessage, CloudApiKey
 from schemas import ChatRequest
 from config import OLLAMA_BASE_URL
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+def is_cloud_model(model_name: str) -> tuple[bool, Optional[str]]:
+    """Check if model is a cloud model and return provider name"""
+    model_lower = model_name.lower()
+    if "gemini" in model_lower:
+        return True, "gemini"
+    elif "gpt" in model_lower:
+        return True, "gpt"
+    elif "grok" in model_lower:
+        return True, "grok"
+    elif "claude" in model_lower:
+        return True, "claude"
+    return False, None
+
+def get_gemini_model_name(model_name: str) -> str:
+    """Extract Gemini model name from full model name"""
+    # Map common model names to Gemini API model names
+    model_lower = model_name.lower()
+    
+    # Gemini 3 series
+    if "gemini3pro" in model_lower or "gemini-3-pro" in model_lower:
+        return "gemini-3-pro-preview"
+    elif "gemini3flash" in model_lower or "gemini-3-flash" in model_lower:
+        return "gemini-3-flash-preview"
+    # Gemini 2.5 series
+    elif "gemini2.5pro" in model_lower or "gemini-2.5-pro" in model_lower:
+        return "gemini-2.5-pro"
+    elif "gemini2.5flash-lite" in model_lower or "gemini-2.5-flash-lite" in model_lower:
+        return "gemini-2.5-flash-lite"
+    elif "gemini2.5flash" in model_lower or "gemini-2.5-flash" in model_lower:
+        return "gemini-2.5-flash"
+    # Gemini 2.0 series
+    elif "gemini2.0flash-lite" in model_lower or "gemini-2.0-flash-lite" in model_lower:
+        return "gemini-2.0-flash-lite"
+    elif "gemini2.0flash" in model_lower or "gemini-2.0-flash" in model_lower:
+        return "gemini-2.0-flash-exp"
+    elif "gemini-2.0" in model_lower or "gemini-2" in model_lower:
+        return "gemini-2.0-flash-exp"
+    # Gemini 1.5 series
+    elif "gemini-1.5-pro" in model_lower or "gemini-pro" in model_lower:
+        return "gemini-1.5-pro"
+    elif "gemini-1.5-flash" in model_lower or "gemini-flash" in model_lower:
+        return "gemini-1.5-flash"
+    elif "gemini" in model_lower:
+        # Default to flash for any gemini model
+        return "gemini-1.5-flash"
+    return model_name
+
+async def generate_gemini_response(request: ChatRequest, db: Session, api_key: str) -> Optional[dict]:
+    """Generate response from Gemini API synchronously"""
+    user = db.query(User).filter(User.id == request.user_id).first()
+    if not user:
+        return {"error": "User not found"}
+
+    session_id = request.session_id or str(uuid.uuid4())
+
+    user_message = ChatMessage(
+        user_id=request.user_id,
+        session_id=session_id,
+        role="user",
+        content=request.message,
+        model=request.model,
+        images=request.images if request.images else None,
+    )
+    db.add(user_message)
+    db.commit()
+    db.refresh(user_message)
+    user_message_id = user_message.id
+
+    contents = []
+    history = db.query(ChatMessage).filter(
+        ChatMessage.user_id == request.user_id,
+        ChatMessage.session_id == session_id,
+        ChatMessage.id != user_message.id
+    ).order_by(ChatMessage.created_at.asc()).limit(20).all()
+
+    for msg in history:
+        parts = [{"text": msg.content}]
+        if msg.images:
+            for img_base64 in msg.images:
+                img_data = img_base64.split(",")[1] if "," in img_base64 else img_base64
+                parts.append({"inline_data": {"mime_type": "image/jpeg", "data": img_data}})
+        contents.append({"role": "user" if msg.role == "user" else "model", "parts": parts})
+
+    current_parts = [{"text": request.message}]
+    if request.images:
+        for img_base64 in request.images:
+            img_data = img_base64.split(",")[1] if "," in img_base64 else img_base64
+            current_parts.append({"inline_data": {"mime_type": "image/jpeg", "data": img_data}})
+    contents.append({"role": "user", "parts": current_parts})
+
+    gemini_model = get_gemini_model_name(request.model)
+    gemini_request = {
+        "contents": contents,
+        "generationConfig": {
+            "temperature": 0.7,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 8192,
+        },
+    }
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
+
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(url, json=gemini_request)
+
+            if response.status_code != 200:
+                error_text = response.text
+                try:
+                    error_json = response.json()
+                    error_message = error_json.get("error", {}).get("message", str(error_json))
+                except json.JSONDecodeError:
+                    error_message = error_text
+                
+                # Rollback user message
+                db.delete(user_message)
+                db.commit()
+                return {"error": f"Gemini API error: {error_message}"}
+
+            response_json = response.json()
+            
+            # Check for safety blocks or empty candidates
+            if not response_json.get("candidates"):
+                finish_reason = response_json.get("promptFeedback", {}).get("blockReason")
+                if finish_reason:
+                    db.delete(user_message)
+                    db.commit()
+                    return {"error": f"Request was blocked by Gemini API due to: {finish_reason}"}
+                else:
+                    db.delete(user_message)
+                    db.commit()
+                    return {"error": "Gemini API returned no content."}
+
+            candidate = response_json["candidates"][0]
+            full_message = "".join(part.get("text", "") for part in candidate.get("content", {}).get("parts", []))
+
+            # Extract token counts
+            usage = response_json.get("usageMetadata", {})
+            prompt_tokens = usage.get("promptTokenCount")
+            completion_tokens = usage.get("candidatesTokenCount")
+
+            # Save assistant message
+            assistant_msg = ChatMessage(
+                user_id=request.user_id,
+                session_id=session_id,
+                role="assistant",
+                content=full_message,
+                model=request.model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+            db.add(assistant_msg)
+            db.commit()
+            db.refresh(assistant_msg)
+
+            return {
+                "content": full_message,
+                "session_id": session_id,
+                "message_id": assistant_msg.id,
+                "done": True,
+            }
+
+    except httpx.TimeoutException:
+        db.delete(user_message)
+        db.commit()
+        return {"error": "Request timeout"}
+    except Exception as e:
+        db.delete(user_message)
+        db.commit()
+        return {"error": f"An unexpected error occurred: {str(e)}"}
+
+
 async def generate_chat_stream(request: ChatRequest, db: Session):
     """Generate streaming chat response"""
-    # Get or create user
+    is_cloud, provider = is_cloud_model(request.model)
+
+    if is_cloud and provider == "gemini":
+        api_key_obj = db.query(CloudApiKey).filter(
+            CloudApiKey.user_id == request.user_id,
+            CloudApiKey.provider == "gemini"
+        ).first()
+
+        if not api_key_obj:
+            yield f"data: {json.dumps({'error': 'Gemini APIキーが登録されていません。モデル管理ページでAPIキーを登録してください。'})}\n\n"
+            return
+        
+        response_data = await generate_gemini_response(request, db, api_key_obj.api_key)
+        yield f"data: {json.dumps(response_data)}\n\n"
+        return
+    
+    # Default to Ollama API
+    # ... (Ollama logic remains the same)
     user = db.query(User).filter(User.id == request.user_id).first()
     if not user:
         yield f"data: {json.dumps({'error': 'User not found'})}\n\n"

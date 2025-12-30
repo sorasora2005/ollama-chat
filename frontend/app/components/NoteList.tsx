@@ -70,3 +70,4 @@ export default function NoteList({ notes, loading, onNoteClick, onChatClick }: N
   )
 }
 
+

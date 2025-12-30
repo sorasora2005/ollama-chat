@@ -57,3 +57,15 @@ class Note(Base):
     
     user = relationship("User")
 
+class CloudApiKey(Base):
+    __tablename__ = "cloud_api_keys"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    provider = Column(String, index=True)  # "gemini", "gpt", "grok", "claude"
+    api_key = Column(Text)  # Encrypted API key
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = relationship("User")
+

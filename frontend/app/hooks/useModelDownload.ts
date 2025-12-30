@@ -24,6 +24,17 @@ export function useModelDownload(
   const downloadModel = async (modelName: string) => {
     if (downloadingModels.has(modelName)) return
 
+    // Check if model is a cloud model (no download required)
+    const nameLower = modelName.toLowerCase()
+    const isCloudModel = nameLower.includes('gemini') || nameLower.includes('gpt-') ||
+                         nameLower.includes('claude') || nameLower.includes('grok')
+    if (isCloudModel) {
+      if (showNotification) {
+        showNotification(`${modelName}はクラウドモデルのため、ダウンロードは不要です`, 'info')
+      }
+      return
+    }
+
     // Check if model is large and show warning
     const sizeRange = estimateModelSizeRange(modelName)
 

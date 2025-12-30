@@ -394,3 +394,4 @@ def get_popular_models() -> List[Dict[str, str]]:
         {"name": "sailor2:20b", "family": "other", "type": "text"},
     ]
 
+

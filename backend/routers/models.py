@@ -161,3 +161,4 @@ async def delete_model(model_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delete error: {str(e)}")
 
+

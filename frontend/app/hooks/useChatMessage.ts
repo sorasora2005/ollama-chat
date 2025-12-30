@@ -154,6 +154,71 @@ export function useChatMessage(
                     throw new Error(data.error)
                   }
 
+                  // Typing animation for non-streaming (Gemini)
+                  if (data.content && data.done) {
+                    const fullText = data.content
+                    let animatedContent = ''
+
+                    // Create assistant message with empty content
+                    const assistantMessage: Message = {
+                      role: 'assistant',
+                      content: '',
+                      model: selectedModel,
+                      session_id: data.session_id || currentSessionId || undefined,
+                      id: `assistant-${Date.now()}-${Math.random()}`,
+                      streamingComplete: false
+                    }
+                    setMessages(prev => {
+                      const newIndex = prev.length
+                      assistantMessageIndexRef.current = newIndex
+                      return [...prev, assistantMessage]
+                    })
+                    setLoading(false)
+                    setIsStreaming(true)
+
+                    const typingInterval = setInterval(() => {
+                      animatedContent = fullText.slice(0, animatedContent.length + 1)
+                      setMessages(prev => {
+                        const newMessages = [...prev]
+                        const indexToUpdate = assistantMessageIndexRef.current
+                        if (indexToUpdate !== null && newMessages[indexToUpdate]) {
+                          newMessages[indexToUpdate] = {
+                            ...newMessages[indexToUpdate],
+                            content: animatedContent
+                          }
+                        }
+                        return newMessages
+                      })
+                      scrollToBottom(messagesEndRef)
+
+                      if (animatedContent.length === fullText.length) {
+                        clearInterval(typingInterval)
+                        setIsStreaming(false)
+                        abortControllerRef.current = null
+                        setMessages(prev => {
+                          const newMessages = [...prev]
+                          const indexToUpdate = assistantMessageIndexRef.current
+                          if (indexToUpdate !== null && newMessages[indexToUpdate]) {
+                            newMessages[indexToUpdate] = {
+                              ...newMessages[indexToUpdate],
+                              streamingComplete: true,
+                              ...(data.message_id ? { id: String(data.message_id) } : {})
+                            }
+                          }
+                          return newMessages
+                        })
+                        if (data.session_id && !currentSessionId) {
+                          setCurrentSessionId(data.session_id)
+                        }
+                        loadSessions(userId)
+                        loadUserFiles(userId)
+                        lastSentMessageContentRef.current = null
+                      }
+                    }, 10) // Typing speed
+                    continue; // Skip other processing for this line
+                  }
+
+                  // Handle streaming content (Ollama)
                   if (data.content) {
                     // Create assistant message on first content chunk
                     if (!assistantMessageCreated) {
@@ -182,6 +247,7 @@ export function useChatMessage(
                       }
                     } else {
                       // Update existing assistant message
+                      // Add new content to the accumulated content
                       fullContent += data.content
                       setMessages(prev => {
                         const newMessages = [...prev]
@@ -198,6 +264,7 @@ export function useChatMessage(
                           })()
 
                         if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
+                          // Use the accumulated fullContent directly to ensure consistency
                           newMessages[indexToUpdate] = {
                             ...newMessages[indexToUpdate],
                             content: fullContent,

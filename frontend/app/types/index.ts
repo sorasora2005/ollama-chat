@@ -58,3 +58,10 @@ export interface Note {
   snippet?: string  // For search results
 }
 
+export interface CloudApiKeys {
+  gemini?: string
+  gpt?: string
+  grok?: string
+  claude?: string
+}
+

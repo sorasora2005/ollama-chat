@@ -54,3 +54,4 @@ async def get_all_users(db: Session = Depends(get_db)):
     
     return {"users": user_list}
 
+

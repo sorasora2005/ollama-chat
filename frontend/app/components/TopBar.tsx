@@ -11,11 +11,10 @@ interface TopBarProps {
   models: Model[]
   modelSearchQuery: string
   downloadingModels: Set<string>
-  deletingModels: Set<string>
+  userId: number | null
   onModelSearchChange: (query: string) => void
   onModelChange: (model: string) => void
   onDownloadModel: (modelName: string) => void
-  onDeleteModel: (modelName: string) => void
   onCancelDownload?: (modelName: string) => void
   currentSessionId: string | null
   messagesLength: number
@@ -35,11 +34,10 @@ export default function TopBar({
   models,
   modelSearchQuery,
   downloadingModels,
-  deletingModels,
+  userId,
   onModelSearchChange,
   onModelChange,
   onDownloadModel,
-  onDeleteModel,
   onCancelDownload,
   currentSessionId,
   messagesLength,
@@ -137,11 +135,10 @@ export default function TopBar({
           models={models}
           modelSearchQuery={modelSearchQuery}
           downloadingModels={downloadingModels}
-          deletingModels={deletingModels}
+          userId={userId}
           onModelSearchChange={onModelSearchChange}
           onModelChange={onModelChange}
           onDownloadModel={onDownloadModel}
-          onDeleteModel={onDeleteModel}
           onClose={() => setShowModelSelector(false)}
         />
       </div>

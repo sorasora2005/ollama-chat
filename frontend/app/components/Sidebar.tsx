@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen } from 'lucide-react'
+import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen, Cpu } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ChatSession, UserFile } from '../types'
 
@@ -83,6 +83,17 @@ export default function Sidebar({
         </button>
 
         <div className="flex-1 overflow-y-auto px-4 scrollbar-hide">
+          {/* Models Link */}
+          <div className="mb-4">
+            <button
+              onClick={() => router.push('/models')}
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-200 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors text-black dark:text-white"
+            >
+              <Cpu className="w-5 h-5" />
+              <span className="text-sm">モデル</span>
+            </button>
+          </div>
+
           {/* Stats Link */}
           <div className="mb-4">
             <button
@@ -126,9 +137,8 @@ export default function Sidebar({
                 <button
                   key={session.session_id}
                   onClick={() => onLoadChatHistory(session.session_id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-[#2d2d2d] transition-colors text-black dark:text-white ${
-                    currentSessionId === session.session_id ? 'bg-gray-200 dark:bg-[#2d2d2d]' : ''
-                  }`}
+                  className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-[#2d2d2d] transition-colors text-black dark:text-white ${currentSessionId === session.session_id ? 'bg-gray-200 dark:bg-[#2d2d2d]' : ''
+                    }`}
                 >
                   <div className="text-sm truncate">{session.title}</div>
                   <div className="text-xs text-gray-600 dark:text-gray-500 mt-1">

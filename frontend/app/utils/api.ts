@@ -154,5 +154,59 @@ export const api = {
     })
     return response.data.results || []
   },
+
+  // Cloud API Keys
+  testApiKey: async (userId: number, provider: string, apiKey: string): Promise<{
+    valid: boolean
+    message: string
+  }> => {
+    const response = await axios.post(`${API_URL}/api/api-keys/test`, {
+      user_id: userId,
+      provider,
+      api_key: apiKey
+    })
+    return response.data
+  },
+
+  saveApiKey: async (userId: number, provider: string, apiKey: string): Promise<{
+    id: number
+    user_id: number
+    provider: string
+    created_at: string
+    updated_at: string
+  }> => {
+    const response = await axios.post(`${API_URL}/api/api-keys`, {
+      user_id: userId,
+      provider,
+      api_key: apiKey
+    })
+    return response.data
+  },
+
+  getApiKeys: async (userId: number): Promise<Array<{
+    id: number
+    user_id: number
+    provider: string
+    created_at: string
+    updated_at: string
+  }>> => {
+    const response = await axios.get(`${API_URL}/api/api-keys/${userId}`)
+    return response.data || []
+  },
+
+  getApiKey: async (userId: number, provider: string): Promise<{
+    id: number
+    user_id: number
+    provider: string
+    created_at: string
+    updated_at: string
+  } | null> => {
+    const response = await axios.get(`${API_URL}/api/api-keys/${userId}/${provider}`)
+    return response.data || null
+  },
+
+  deleteApiKey: async (userId: number, provider: string): Promise<void> => {
+    await axios.delete(`${API_URL}/api/api-keys/${userId}/${provider}`)
+  },
 }
 
