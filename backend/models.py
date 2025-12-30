@@ -22,6 +22,7 @@ class ChatMessage(Base):
     content = Column(Text)
     model = Column(String, index=True)  # Model name used
     images = Column(JSON, nullable=True)  # Base64 encoded images array
+    is_cancelled = Column(Integer, default=0)  # Flag to indicate if generation was cancelled (0 = false, 1 = true)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="messages")

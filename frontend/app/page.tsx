@@ -154,6 +154,7 @@ export default function Home() {
     cancelStreaming: cancelChatStreaming,
     copyMessage,
     regenerateMessage,
+    isStreaming,
   } = useChatMessage(
     userId,
     selectedModel,
@@ -328,10 +329,15 @@ export default function Home() {
   const handleSendWithFile = () => {
     if (uploadedFile && input.trim()) {
       sendChatMessage(input.trim(), uploadedFile)
+      setInput('')
+      setUploadedFile(null)
     } else if (uploadedFile) {
       sendChatMessage('この画像について説明してください。', uploadedFile)
+      setInput('')
+      setUploadedFile(null)
     } else if (input.trim()) {
       sendChatMessage(input.trim(), null)
+      setInput('')
     }
   }
 
@@ -340,6 +346,15 @@ export default function Home() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendWithFile()
+    }
+  }
+
+  // Handle cancel streaming and restore message content
+  const handleCancelStreaming = () => {
+    const restoredContent = cancelChatStreaming()
+    if (restoredContent) {
+      setInput(restoredContent.text)
+      setUploadedFile(restoredContent.file)
     }
   }
 
@@ -507,6 +522,7 @@ export default function Home() {
           currentSessionId={currentSessionId}
           messagesLength={messages.length}
           onExportChatHistory={handleExportChatHistory}
+          onCreateNewChat={handleCreateNewChat}
         />
 
         {/* Messages Area */}
@@ -543,7 +559,7 @@ export default function Home() {
           input={input}
           uploading={uploading}
           uploadedFile={uploadedFile}
-          loading={loading}
+          loading={loading || isStreaming}
           userId={userId}
           selectedModel={selectedModel}
           supportsImages={supportsImages}
@@ -553,7 +569,7 @@ export default function Home() {
           onFileUpload={handleFileUpload}
           onRemoveFile={() => setUploadedFile(null)}
           onSend={handleSendWithFile}
-          onCancel={cancelChatStreaming}
+          onCancel={handleCancelStreaming}
           onKeyPress={handleKeyPress}
         />
       </div>

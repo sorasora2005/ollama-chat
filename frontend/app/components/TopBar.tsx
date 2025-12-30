@@ -19,6 +19,7 @@ interface TopBarProps {
   currentSessionId: string | null
   messagesLength: number
   onExportChatHistory: () => void
+  onCreateNewChat: () => void
 }
 
 export default function TopBar({
@@ -38,6 +39,7 @@ export default function TopBar({
   currentSessionId,
   messagesLength,
   onExportChatHistory,
+  onCreateNewChat,
 }: TopBarProps) {
   return (
     <div className="h-14 border-b border-gray-300 dark:border-gray-800 flex items-center justify-between px-4">
@@ -50,7 +52,12 @@ export default function TopBar({
             <Menu className="w-5 h-5 text-black dark:text-white" />
           </button>
         )}
-        <span className="font-semibold text-black dark:text-white">Ollama Chat</span>
+        <button
+          onClick={onCreateNewChat}
+          className="font-semibold text-black dark:text-white hover:opacity-70 transition-opacity cursor-pointer"
+        >
+          Ollama Chat
+        </button>
       </div>
       <div className="flex items-center gap-3 relative model-selector">
         {/* Export History Button */}

@@ -7,6 +7,7 @@ from typing import Optional
 import httpx
 import json
 import uuid
+import asyncio
 
 from database import get_db
 from models import User, ChatMessage
@@ -44,6 +45,8 @@ async def generate_chat_stream(request: ChatRequest, db: Session):
     )
     db.add(user_message)
     db.commit()
+    db.refresh(user_message)  # Refresh to get the ID
+    user_message_id = user_message.id
     
     # Prepare messages for Ollama
     # For new chats, only send the current message (no history)
@@ -83,6 +86,8 @@ async def generate_chat_stream(request: ChatRequest, db: Session):
     
     # Call Ollama API with streaming
     full_message = ""
+    message_saved = False
+    was_cancelled = False  # Track if this was a cancellation vs error
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
             ollama_request = {
@@ -98,37 +103,127 @@ async def generate_chat_stream(request: ChatRequest, db: Session):
             ) as response:
                 if response.status_code != 200:
                     error_text = await response.aread()
+                    # Delete user message on error
+                    try:
+                        user_msg_to_delete = db.query(ChatMessage).filter(ChatMessage.id == user_message_id).first()
+                        if user_msg_to_delete:
+                            db.delete(user_msg_to_delete)
+                            db.commit()
+                    except Exception as db_error:
+                        print(f"Error deleting user message on error: {db_error}")
                     yield f"data: {json.dumps({'error': f'Ollama API error: {error_text.decode()}'})}\n\n"
                     return
                 
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        chunk_data = json.loads(line)
-                        if "message" in chunk_data and "content" in chunk_data["message"]:
-                            content = chunk_data["message"]["content"]
-                            full_message += content
-                            yield f"data: {json.dumps({'content': content, 'session_id': session_id, 'done': chunk_data.get('done', False)})}\n\n"
-                        
-                        if chunk_data.get("done", False):
-                            # Save assistant response to database
+                try:
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            chunk_data = json.loads(line)
+                            if "message" in chunk_data and "content" in chunk_data["message"]:
+                                content = chunk_data["message"]["content"]
+                                full_message += content
+                                yield f"data: {json.dumps({'content': content, 'session_id': session_id, 'done': chunk_data.get('done', False)})}\n\n"
+                            
+                            if chunk_data.get("done", False):
+                                # Save assistant response to database
+                                assistant_msg = ChatMessage(
+                                    user_id=request.user_id,
+                                    session_id=session_id,
+                                    role="assistant",
+                                    content=full_message,
+                                    model=request.model
+                                )
+                                db.add(assistant_msg)
+                                db.commit()
+                                message_saved = True
+                                break
+                        except json.JSONDecodeError:
+                            continue
+                except (asyncio.CancelledError, ConnectionError) as e:
+                    # Client disconnected - mark as cancelled
+                    was_cancelled = True
+                    # Save cancelled assistant message
+                    if not message_saved:
+                        try:
+                            cancelled_content = full_message.strip() if full_message.strip() else "生成途中でキャンセルされました。"
                             assistant_msg = ChatMessage(
                                 user_id=request.user_id,
                                 session_id=session_id,
                                 role="assistant",
-                                content=full_message,
-                                model=request.model
+                                content=cancelled_content,
+                                model=request.model,
+                                is_cancelled=1
                             )
                             db.add(assistant_msg)
                             db.commit()
-                            break
-                    except json.JSONDecodeError:
-                        continue
+                            message_saved = True
+                        except Exception as db_error:
+                            print(f"Error saving cancelled message: {db_error}")
+                    raise  # Re-raise to properly close the stream
+    except (asyncio.CancelledError, ConnectionError):
+        # Client disconnected - mark as cancelled and save cancelled assistant message
+        was_cancelled = True
+        if not message_saved:
+            try:
+                cancelled_content = full_message.strip() if full_message.strip() else "生成途中でキャンセルされました。"
+                assistant_msg = ChatMessage(
+                    user_id=request.user_id,
+                    session_id=session_id,
+                    role="assistant",
+                    content=cancelled_content,
+                    model=request.model,
+                    is_cancelled=1
+                )
+                db.add(assistant_msg)
+                db.commit()
+                message_saved = True
+            except Exception as db_error:
+                print(f"Error saving cancelled message on disconnect: {db_error}")
+        # Don't yield error message - client already disconnected
     except httpx.TimeoutException:
+        # Delete user message on timeout
+        if not message_saved:
+            try:
+                user_msg_to_delete = db.query(ChatMessage).filter(ChatMessage.id == user_message_id).first()
+                if user_msg_to_delete:
+                    db.delete(user_msg_to_delete)
+                    db.commit()
+            except Exception as db_error:
+                print(f"Error deleting user message on timeout: {db_error}")
         yield f"data: {json.dumps({'error': 'Request timeout'})}\n\n"
     except Exception as e:
+        # Delete user message on error
+        if not message_saved:
+            try:
+                user_msg_to_delete = db.query(ChatMessage).filter(ChatMessage.id == user_message_id).first()
+                if user_msg_to_delete:
+                    db.delete(user_msg_to_delete)
+                    db.commit()
+            except Exception as db_error:
+                print(f"Error deleting user message on error: {db_error}")
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    finally:
+        # Save cancelled assistant message if streaming was cancelled and message not saved
+        # This handles GeneratorExit which can't be caught in except
+        # Only save if it was a cancellation (not an error)
+        if not message_saved and was_cancelled:
+            try:
+                cancelled_content = full_message.strip() if full_message.strip() else "生成途中でキャンセルされました。"
+                assistant_msg = ChatMessage(
+                    user_id=request.user_id,
+                    session_id=session_id,
+                    role="assistant",
+                    content=cancelled_content,
+                    model=request.model,
+                    is_cancelled=1
+                )
+                db.add(assistant_msg)
+                db.commit()
+            except Exception as db_error:
+                # Message may have already been saved or error occurred
+                # This is fine - just continue
+                pass
 
 @router.post("")
 async def chat(
@@ -170,7 +265,8 @@ async def get_chat_history(user_id: int, session_id: Optional[str] = None, db: S
                 "model": msg.model,
                 "session_id": msg.session_id,
                 "images": msg.images if msg.images else None,  # Include images in response
-                "id": str(msg.id)  # Include message ID
+                "id": str(msg.id),  # Include message ID
+                "is_cancelled": bool(msg.is_cancelled) if hasattr(msg, 'is_cancelled') else False  # Include cancellation flag
             }
             for msg in messages
         ],

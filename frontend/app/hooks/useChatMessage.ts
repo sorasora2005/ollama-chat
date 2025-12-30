@@ -21,12 +21,15 @@ export function useChatMessage(
 ) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [clickedButton, setClickedButton] = useState<{ type: string, index: number } | null>(null)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const lastSentMessageContentRef = useRef<{ text: string, file: { filename: string, images: string[] } | null } | null>(null)
 
-  const cancelStreaming = () => {
+  const cancelStreaming = (): { text: string, file: { filename: string, images: string[] } | null } | null => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
       setLoading(false)
+      setIsStreaming(false)
       // Add or update assistant message with cancellation notice
       setMessages(prev => {
         const newMessages = [...prev]
@@ -39,24 +42,29 @@ export function useChatMessage(
           if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
             newMessages[indexToUpdate] = {
               ...newMessages[indexToUpdate],
-              content: newMessages[indexToUpdate].content.trim() || '生成を中断しました。',
-              streamingComplete: true
+              content: newMessages[indexToUpdate].content.trim() || '生成途中でキャンセルされました。',
+              streamingComplete: true,
+              is_cancelled: true
             }
           }
         } else {
           // Add new cancellation message
           const cancellationMessage: Message = {
             role: 'assistant',
-            content: '生成を中断しました。',
+            content: '生成途中でキャンセルされました。',
             id: `cancelled-${Date.now()}-${Math.random()}`,
-            streamingComplete: true
+            streamingComplete: true,
+            is_cancelled: true
           }
           newMessages.push(cancellationMessage)
         }
         return newMessages
       })
       assistantMessageIndexRef.current = null
+      // Return the last sent message content for restoration
+      return lastSentMessageContentRef.current
     }
+    return null
   }
 
   const sendMessage = async (
@@ -70,6 +78,12 @@ export function useChatMessage(
     // Cancel previous request if any
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
+    }
+
+    // Save the message content and file for potential restoration on cancel
+    lastSentMessageContentRef.current = {
+      text: textToSend || (uploadedFile ? `この画像について説明してください。` : ''),
+      file: uploadedFile
     }
 
     const userMessage: Message = {
@@ -88,6 +102,7 @@ export function useChatMessage(
     }
     const imagesToSend = uploadedFile?.images || null
     setLoading(true)
+    setIsStreaming(false)
     assistantMessageIndexRef.current = null  // Reset assistant message index
 
     // Create new AbortController for this request
@@ -144,6 +159,7 @@ export function useChatMessage(
                     if (!assistantMessageCreated) {
                       assistantMessageCreated = true
                       fullContent = data.content
+                      setIsStreaming(true)  // Mark as streaming
                       const assistantMessage: Message = {
                         role: 'assistant',
                         content: fullContent,
@@ -200,6 +216,7 @@ export function useChatMessage(
 
                   if (data.done) {
                     setLoading(false)  // Ensure loading is false when done
+                    setIsStreaming(false)  // Mark streaming as complete
                     abortControllerRef.current = null  // Clear abort controller
 
                     // Handle cancellation
@@ -216,17 +233,19 @@ export function useChatMessage(
                           if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
                             newMessages[indexToUpdate] = {
                               ...newMessages[indexToUpdate],
-                              content: newMessages[indexToUpdate].content.trim() || '生成を中断しました。',
-                              streamingComplete: true
+                              content: newMessages[indexToUpdate].content.trim() || '生成途中でキャンセルされました。',
+                              streamingComplete: true,
+                              is_cancelled: true
                             }
                           }
                         } else {
                           // Add new cancellation message
                           const cancellationMessage: Message = {
                             role: 'assistant',
-                            content: '生成を中断しました。',
+                            content: '生成途中でキャンセルされました。',
                             id: `cancelled-${Date.now()}-${Math.random()}`,
-                            streamingComplete: true
+                            streamingComplete: true,
+                            is_cancelled: true
                           }
                           newMessages.push(cancellationMessage)
                         }
@@ -264,6 +283,8 @@ export function useChatMessage(
                     }
                     await loadSessions(userId)
                     await loadUserFiles(userId)
+                    // Clear the saved message content after successful completion
+                    lastSentMessageContentRef.current = null
                     break
                   }
                 } catch (e) {
@@ -276,6 +297,7 @@ export function useChatMessage(
           // Handle read errors (including abort)
           if (readError.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
             setLoading(false)
+            setIsStreaming(false)
             abortControllerRef.current = null
             // Add or update assistant message with cancellation notice
             setMessages(prev => {
@@ -289,23 +311,26 @@ export function useChatMessage(
                 if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
                   newMessages[indexToUpdate] = {
                     ...newMessages[indexToUpdate],
-                    content: newMessages[indexToUpdate].content.trim() || '生成を中断しました。',
-                    streamingComplete: true
+                    content: newMessages[indexToUpdate].content.trim() || '生成途中でキャンセルされました。',
+                    streamingComplete: true,
+                    is_cancelled: true
                   }
                 }
               } else {
                 // Add new cancellation message
                 const cancellationMessage: Message = {
                   role: 'assistant',
-                  content: '生成を中断しました。',
+                  content: '生成途中でキャンセルされました。',
                   id: `cancelled-${Date.now()}-${Math.random()}`,
-                  streamingComplete: true
+                  streamingComplete: true,
+                  is_cancelled: true
                 }
                 newMessages.push(cancellationMessage)
               }
               return newMessages
             })
             assistantMessageIndexRef.current = null
+            // Note: lastSentMessageContentRef is kept for restoration
             return
           }
           throw readError
@@ -315,6 +340,7 @@ export function useChatMessage(
       // Don't show error if it was aborted
       if (error.name === 'AbortError') {
         setLoading(false)
+        setIsStreaming(false)
         abortControllerRef.current = null
         // Add or update assistant message with cancellation notice
         setMessages(prev => {
@@ -345,12 +371,15 @@ export function useChatMessage(
           return newMessages
         })
         assistantMessageIndexRef.current = null
+        // Note: lastSentMessageContentRef is kept for restoration
         return
       }
 
       console.error('Failed to send message:', error)
       assistantMessageIndexRef.current = null  // Reset on error
       abortControllerRef.current = null
+      // Clear saved message content on error (not cancellation)
+      lastSentMessageContentRef.current = null
 
       // If user not found, clear localStorage and show username modal
       if (error.message?.includes('User not found') || error.message?.includes('404')) {
@@ -368,6 +397,7 @@ export function useChatMessage(
       setMessages(prev => [...prev, errorMessage])
     } finally {
       setLoading(false)
+      setIsStreaming(false)
     }
   }
 
@@ -411,6 +441,7 @@ export function useChatMessage(
     cancelStreaming,
     copyMessage,
     regenerateMessage,
+    isStreaming,
   }
 }
 

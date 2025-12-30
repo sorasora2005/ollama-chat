@@ -7,6 +7,7 @@ export interface Message {
   images?: string[]  // Base64 encoded images
   id?: string  // Unique ID for React key
   streamingComplete?: boolean  // Flag to track if streaming is complete
+  is_cancelled?: boolean  // Flag to indicate if generation was cancelled
 }
 
 export interface Model {

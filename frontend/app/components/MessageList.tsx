@@ -1,6 +1,7 @@
 'use client'
 
-import { Copy, RotateCcw } from 'lucide-react'
+import { useState } from 'react'
+import { Copy, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { Message } from '../types'
 
 interface MessageListProps {
@@ -28,6 +29,41 @@ export default function MessageList({
   onCopyMessage,
   onRegenerateMessage,
 }: MessageListProps) {
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
+
+  const toggleMessageExpansion = (messageId: string) => {
+    setExpandedMessages(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId)
+      } else {
+        newSet.add(messageId)
+      }
+      return newSet
+    })
+  }
+
+  const getMessageLines = (content: string): string[] => {
+    return content.split('\n')
+  }
+
+  const shouldCollapse = (content: string): boolean => {
+    const lines = getMessageLines(content)
+    return lines.length > 6
+  }
+
+  const getDisplayContent = (content: string, messageId: string): string => {
+    if (!shouldCollapse(content)) {
+      return content
+    }
+    const isExpanded = expandedMessages.has(messageId)
+    if (isExpanded) {
+      return content
+    }
+    const lines = getMessageLines(content)
+    return lines.slice(0, 6).join('\n')
+  }
+
   return (
     <div className="max-w-3xl mx-auto w-full space-y-6 flex flex-col">
       <div ref={messagesStartRef} />
@@ -86,9 +122,24 @@ export default function MessageList({
             <div className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
               {message.role === 'user' ? (
                 <div
-                  className={`${isShortMessage ? 'max-w-fit' : 'max-w-[80%]'} rounded-2xl px-4 py-3 bg-gray-100 dark:bg-[#2d2d2d] text-black dark:text-white`}
+                  className={`${isShortMessage ? 'max-w-fit' : 'max-w-[80%]'} rounded-2xl px-4 py-3 bg-gray-100 dark:bg-[#2d2d2d] text-black dark:text-white relative ${
+                    shouldCollapse(message.content) ? 'pr-16' : ''
+                  }`}
                   style={isShortMessage ? {} : { wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
+                  {shouldCollapse(message.content) && (
+                    <button
+                      onClick={() => toggleMessageExpansion(message.id || `msg-${index}`)}
+                      className="absolute top-2 right-2 p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg transition-all flex items-center gap-1 z-10"
+                      title={expandedMessages.has(message.id || `msg-${index}`) ? '折りたたむ' : '展開する'}
+                    >
+                      {expandedMessages.has(message.id || `msg-${index}`) ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
                   {message.images && message.images.length > 0 && (() => {
                     const fileMatch1 = message.content.match(/ファイル:\s*(.+?)(?:\n|$)/)
                     const fileMatch2 = message.content.match(/ファイル:\s*(.+)/)
@@ -114,12 +165,14 @@ export default function MessageList({
                     )
                   })()}
                   <div className="whitespace-pre-wrap" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                    {message.content}
+                    {getDisplayContent(message.content, message.id || `msg-${index}`)}
                   </div>
                 </div>
               ) : (
                 <div
-                  className={`${isShortMessage ? 'max-w-fit' : 'max-w-[80%]'} rounded-2xl px-4 py-3 text-black dark:text-white`}
+                  className={`${isShortMessage ? 'max-w-fit' : 'max-w-[80%]'} rounded-2xl px-4 py-3 text-black dark:text-white ${
+                    message.is_cancelled ? 'bg-gray-200 dark:bg-[#3d3d3d] border border-gray-400 dark:border-gray-600' : ''
+                  }`}
                   style={isShortMessage ? {} : { wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
                   {message.images && message.images.length > 0 && (
@@ -141,6 +194,28 @@ export default function MessageList({
                   <div className="whitespace-pre-wrap" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
                     {message.content}
                   </div>
+                  {message.is_cancelled && (
+                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
+                      ⚠️ 生成途中でキャンセルされました
+                    </div>
+                  )}
+                </div>
+              )}
+              {message.role === 'user' && (
+                <div className="flex items-center gap-1 mt-2">
+                  <button
+                    onClick={() => {
+                      onCopyMessage(message.content, index)
+                    }}
+                    className={`p-2 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg transition-all mr-1 ${
+                      clickedButton?.type === 'copy' && clickedButton?.index === index 
+                        ? 'animate-float bg-gray-200 dark:bg-[#3d3d3d]' 
+                        : ''
+                    }`}
+                    title="コピー"
+                  >
+                    <Copy className={`w-4 h-4 transition-colors ${copiedIndex === index ? 'text-green-500' : 'text-gray-600 dark:text-gray-400'}`} />
+                  </button>
                 </div>
               )}
               {message.role === 'assistant' && !isStreaming && (message.streamingComplete === true || message.streamingComplete === undefined) && (

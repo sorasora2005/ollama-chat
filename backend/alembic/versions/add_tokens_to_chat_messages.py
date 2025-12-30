@@ -1,7 +1,7 @@
 """Add tokens columns to chat_messages
 
 Revision ID: add_tokens_columns
-Revises: add_feedback_table
+Revises: 9b3912b7930f
 Create Date: 2025-12-29 15:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_tokens_columns'
-down_revision = 'add_feedback_table'
+down_revision = '9b3912b7930f'
 branch_labels = None
 depends_on = None
 
