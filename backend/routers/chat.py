@@ -30,37 +30,9 @@ def is_cloud_model(model_name: str) -> tuple[bool, Optional[str]]:
     return False, None
 
 def get_gemini_model_name(model_name: str) -> str:
-    """Extract Gemini model name from full model name"""
-    # Map common model names to Gemini API model names
-    model_lower = model_name.lower()
-    
-    # Gemini 3 series
-    if "gemini3pro" in model_lower or "gemini-3-pro" in model_lower:
-        return "gemini-3-pro-preview"
-    elif "gemini3flash" in model_lower or "gemini-3-flash" in model_lower:
-        return "gemini-3-flash-preview"
-    # Gemini 2.5 series
-    elif "gemini2.5pro" in model_lower or "gemini-2.5-pro" in model_lower:
-        return "gemini-2.5-pro"
-    elif "gemini2.5flash-lite" in model_lower or "gemini-2.5-flash-lite" in model_lower:
-        return "gemini-2.5-flash-lite"
-    elif "gemini2.5flash" in model_lower or "gemini-2.5-flash" in model_lower:
-        return "gemini-2.5-flash"
-    # Gemini 2.0 series
-    elif "gemini2.0flash-lite" in model_lower or "gemini-2.0-flash-lite" in model_lower:
-        return "gemini-2.0-flash-lite"
-    elif "gemini2.0flash" in model_lower or "gemini-2.0-flash" in model_lower:
-        return "gemini-2.0-flash-exp"
-    elif "gemini-2.0" in model_lower or "gemini-2" in model_lower:
-        return "gemini-2.0-flash-exp"
-    # Gemini 1.5 series
-    elif "gemini-1.5-pro" in model_lower or "gemini-pro" in model_lower:
-        return "gemini-1.5-pro"
-    elif "gemini-1.5-flash" in model_lower or "gemini-flash" in model_lower:
-        return "gemini-1.5-flash"
-    elif "gemini" in model_lower:
-        # Default to flash for any gemini model
-        return "gemini-1.5-flash"
+    """Get Gemini API model name (frontend now sends API-compatible names)"""
+    # Frontend now sends API-compatible model names, so just return as-is
+    # This function is kept for backward compatibility
     return model_name
 
 async def generate_gemini_response(request: ChatRequest, db: Session, api_key: str) -> Optional[dict]:

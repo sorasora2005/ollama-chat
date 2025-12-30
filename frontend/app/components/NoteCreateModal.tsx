@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Loader2, ChevronDown, Search } from 'lucide-react'
 import { Model } from '../types'
+import { useCloudApiKeys } from '../hooks/useCloudApiKeys'
 
 interface NoteCreateModalProps {
   isOpen: boolean
   models: Model[]
   selectedModel: string
+  userId: number | null
   onClose: () => void
   onCreateNote: (model: string, prompt: string) => Promise<void>
 }
@@ -16,6 +18,7 @@ export default function NoteCreateModal({
   isOpen,
   models,
   selectedModel,
+  userId,
   onClose,
   onCreateNote,
 }: NoteCreateModalProps) {
@@ -25,6 +28,8 @@ export default function NoteCreateModal({
   const [showModelSelector, setShowModelSelector] = useState(false)
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const modelSelectorRef = useRef<HTMLDivElement>(null)
+
+  const { apiKeys } = useCloudApiKeys(userId)
 
   useEffect(() => {
     if (isOpen) {
@@ -48,6 +53,34 @@ export default function NoteCreateModal({
     }
   }, [showModelSelector])
 
+  // Check if model is a cloud model (no download required)
+  const isCloudModel = (model: Model) => {
+    if (!model) return false
+    const nameLower = model.name?.toLowerCase() || ''
+    const familyLower = model.family?.toLowerCase() || ''
+    return familyLower === 'gemini' || familyLower === 'gpt' ||
+           familyLower === 'claude' || familyLower === 'grok' ||
+           nameLower.includes('gemini') || nameLower.includes('gpt-') ||
+           nameLower.includes('claude') || nameLower.includes('grok')
+  }
+
+  // Get API provider from model family
+  const getApiProvider = (family: string): 'gemini' | 'gpt' | 'grok' | 'claude' | null => {
+    const familyLower = family.toLowerCase()
+    if (familyLower === 'gemini') return 'gemini'
+    if (familyLower === 'gpt') return 'gpt'
+    if (familyLower === 'grok') return 'grok'
+    if (familyLower === 'claude') return 'claude'
+    return null
+  }
+
+  // Check if a cloud model has API key registered
+  const hasCloudApiKey = (model: Model) => {
+    if (!isCloudModel(model)) return false
+    const apiProvider = model.family ? getApiProvider(model.family) : null
+    return apiProvider ? !!apiKeys[apiProvider] : false
+  }
+
   const filterModels = (modelList: Model[]) => {
     if (!modelSearchQuery || !modelSearchQuery.trim()) return modelList
     const query = modelSearchQuery.toLowerCase().trim()
@@ -63,7 +96,10 @@ export default function NoteCreateModal({
     })
   }
 
-  const downloadedModels = filterModels(models.filter(m => m && m.downloaded))
+  // Show both downloaded models AND cloud models with API keys
+  const availableModels = filterModels(
+    models.filter(m => m && (m.downloaded || hasCloudApiKey(m)))
+  )
   const selectedModelInfo = models.find(m => m.name === model)
 
   const handleCreate = async () => {
@@ -137,12 +173,12 @@ export default function NoteCreateModal({
 
                 {/* Models List */}
                 <div className="flex-1 overflow-y-auto p-3">
-                  {downloadedModels.length === 0 ? (
+                  {availableModels.length === 0 ? (
                     <div className="text-xs text-gray-600 dark:text-gray-500 py-2">
-                      {modelSearchQuery.trim() ? '検索結果が見つかりませんでした' : 'ダウンロード済みのモデルがありません'}
+                      {modelSearchQuery.trim() ? '検索結果が見つかりませんでした' : '利用可能なモデルがありません'}
                     </div>
                   ) : (
-                    downloadedModels.map((m) => (
+                    availableModels.map((m) => (
                       <button
                         key={m.name}
                         type="button"

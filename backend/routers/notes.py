@@ -7,11 +7,32 @@ import json
 import asyncio
 
 from database import get_db, SessionLocal
-from models import User, ChatMessage, Note
+from models import User, ChatMessage, Note, CloudApiKey
 from schemas import NoteCreateRequest, NoteResponse
 from config import OLLAMA_BASE_URL
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
+
+
+def is_cloud_model(model_name: str) -> tuple[bool, Optional[str]]:
+    """Check if model is a cloud model and return provider name"""
+    model_lower = model_name.lower()
+    if "gemini" in model_lower:
+        return True, "gemini"
+    elif "gpt" in model_lower:
+        return True, "gpt"
+    elif "grok" in model_lower:
+        return True, "grok"
+    elif "claude" in model_lower:
+        return True, "claude"
+    return False, None
+
+
+def get_gemini_model_name(model_name: str) -> str:
+    """Get Gemini API model name (frontend now sends API-compatible names)"""
+    # Frontend now sends API-compatible model names, so just return as-is
+    # This function is kept for backward compatibility
+    return model_name
 
 
 async def generate_note_content(
@@ -30,61 +51,142 @@ async def generate_note_content(
             ChatMessage.user_id == user_id,
             ChatMessage.session_id == session_id
         ).order_by(ChatMessage.created_at.asc()).all()
-        
-        # Prepare messages for Ollama
-        ollama_messages = []
-        for msg in messages:
-            msg_dict = {
-                "role": msg.role,
-                "content": msg.content
-            }
-            if msg.images and len(msg.images) > 0:
-                msg_dict["images"] = msg.images
-            ollama_messages.append(msg_dict)
-        
-        # Add the user's prompt as a system message
-        system_message = {
-            "role": "user",
-            "content": prompt
-        }
-        ollama_messages.append(system_message)
-        
-        # Call Ollama API
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            ollama_request = {
-                "model": model,
-                "messages": ollama_messages,
-                "stream": False
-            }
-            
-            response = await client.post(
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json=ollama_request
-            )
-            
-            if response.status_code != 200:
-                # Update note with error message
+
+        # Check if this is a cloud model
+        is_cloud, provider = is_cloud_model(model)
+
+        generated_content = ""
+
+        if is_cloud and provider == "gemini":
+            # Get API key
+            api_key_obj = db.query(CloudApiKey).filter(
+                CloudApiKey.user_id == user_id,
+                CloudApiKey.provider == "gemini"
+            ).first()
+
+            if not api_key_obj:
                 note = db.query(Note).filter(Note.id == note_id).first()
                 if note:
-                    note.content = f"エラー: ノートの生成に失敗しました。{response.text}"
+                    note.content = "エラー: Gemini APIキーが登録されていません。"
                     db.commit()
                 return
-            
-            response_data = response.json()
-            generated_content = response_data.get("message", {}).get("content", "")
-            
-            # Extract title from first line or use default
-            lines = generated_content.split('\n')
-            title = lines[0][:50] if lines else "ノート"
-            if len(lines[0]) > 50:
-                title += "..."
-            
-            # Update note with generated content
-            note = db.query(Note).filter(Note.id == note_id).first()
-            if note:
-                note.title = title
-                note.content = generated_content
-                db.commit()
+
+            # Prepare messages for Gemini
+            contents = []
+            for msg in messages:
+                parts = [{"text": msg.content}]
+                # Add images if present
+                if msg.images and len(msg.images) > 0:
+                    for img_base64 in msg.images:
+                        img_data = img_base64.split(",")[1] if "," in img_base64 else img_base64
+                        parts.append({"inline_data": {"mime_type": "image/jpeg", "data": img_data}})
+
+                role = "user" if msg.role == "user" else "model"
+                contents.append({"role": role, "parts": parts})
+
+            # Add the prompt as final user message
+            contents.append({"role": "user", "parts": [{"text": prompt}]})
+
+            gemini_model = get_gemini_model_name(model)
+            gemini_request = {
+                "contents": contents,
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "topK": 40,
+                    "topP": 0.95,
+                    "maxOutputTokens": 8192,
+                },
+            }
+
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key_obj.api_key}"
+
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(url, json=gemini_request)
+
+                if response.status_code != 200:
+                    note = db.query(Note).filter(Note.id == note_id).first()
+                    if note:
+                        try:
+                            error_json = response.json()
+                            error_message = error_json.get("error", {}).get("message", str(error_json))
+                        except:
+                            error_message = response.text
+                        note.content = f"エラー: Gemini API error: {error_message}"
+                        db.commit()
+                    return
+
+                response_json = response.json()
+
+                # Check for safety blocks or empty candidates
+                if not response_json.get("candidates"):
+                    finish_reason = response_json.get("promptFeedback", {}).get("blockReason")
+                    note = db.query(Note).filter(Note.id == note_id).first()
+                    if note:
+                        if finish_reason:
+                            note.content = f"エラー: Request was blocked by Gemini API due to: {finish_reason}"
+                        else:
+                            note.content = "エラー: Gemini API returned no content."
+                        db.commit()
+                    return
+
+                candidate = response_json["candidates"][0]
+                generated_content = "".join(part.get("text", "") for part in candidate.get("content", {}).get("parts", []))
+
+        else:
+            # Use Ollama API for local models
+            ollama_messages = []
+            for msg in messages:
+                msg_dict = {
+                    "role": msg.role,
+                    "content": msg.content
+                }
+                if msg.images and len(msg.images) > 0:
+                    msg_dict["images"] = msg.images
+                ollama_messages.append(msg_dict)
+
+            # Add the user's prompt as a system message
+            system_message = {
+                "role": "user",
+                "content": prompt
+            }
+            ollama_messages.append(system_message)
+
+            # Call Ollama API
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                ollama_request = {
+                    "model": model,
+                    "messages": ollama_messages,
+                    "stream": False
+                }
+
+                response = await client.post(
+                    f"{OLLAMA_BASE_URL}/api/chat",
+                    json=ollama_request
+                )
+
+                if response.status_code != 200:
+                    # Update note with error message
+                    note = db.query(Note).filter(Note.id == note_id).first()
+                    if note:
+                        note.content = f"エラー: ノートの生成に失敗しました。{response.text}"
+                        db.commit()
+                    return
+
+                response_data = response.json()
+                generated_content = response_data.get("message", {}).get("content", "")
+
+        # Extract title from first line or use default
+        lines = generated_content.split('\n')
+        title = lines[0][:50] if lines else "ノート"
+        if len(lines[0]) > 50:
+            title += "..."
+
+        # Update note with generated content
+        note = db.query(Note).filter(Note.id == note_id).first()
+        if note:
+            note.title = title
+            note.content = generated_content
+            db.commit()
     except Exception as e:
         # Update note with error message
         note = db.query(Note).filter(Note.id == note_id).first()

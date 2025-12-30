@@ -590,6 +590,7 @@ export default function Home() {
         isOpen={showNoteCreateModal}
         models={models}
         selectedModel={selectedModel}
+        userId={userId}
         onClose={() => setShowNoteCreateModal(false)}
         onCreateNote={handleCreateNote}
       />
