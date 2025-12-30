@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class UserCreate(BaseModel):
@@ -30,4 +30,13 @@ class ChatResponse(BaseModel):
     message: str
     model: str
     session_id: Optional[str] = None
+
+class FeedbackCreate(BaseModel):
+    user_id: int
+    message_id: int
+    feedback_type: str  # "positive" or "negative"
+
+class FeedbackStatsResponse(BaseModel):
+    user_id: int
+    stats: List[dict]
 

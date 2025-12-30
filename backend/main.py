@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, engine, ensure_columns_exist
-from routers import models, users, chat, upload
+from routers import models, users, chat, upload, feedback
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -30,6 +30,7 @@ app.include_router(models.router)
 app.include_router(users.router)
 app.include_router(chat.router)
 app.include_router(upload.router)
+app.include_router(feedback.router)
 
 @app.get("/")
 async def root():

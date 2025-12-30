@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, Search, Plus, ChevronRight, LogOut, Sun, Moon, FileText } from 'lucide-react'
+import { Menu, Search, Plus, ChevronRight, LogOut, Sun, Moon, FileText, BarChart3 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ChatSession, UserFile } from '../types'
 
@@ -83,6 +83,17 @@ export default function Sidebar({
         </button>
 
         <div className="flex-1 overflow-y-auto px-4 scrollbar-hide">
+          {/* Stats Link */}
+          <div className="mb-4">
+            <button
+              onClick={() => router.push('/stats')}
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-200 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors text-black dark:text-white"
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span className="text-sm">統計情報</span>
+            </button>
+          </div>
+
           {/* Files Section */}
           <div className="mb-4">
             {userFiles.length > 3 ? (

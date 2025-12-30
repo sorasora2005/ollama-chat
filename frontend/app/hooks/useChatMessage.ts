@@ -215,12 +215,11 @@ export function useChatMessage(
                   }
 
                   if (data.done) {
-                    setLoading(false)  // Ensure loading is false when done
-                    setIsStreaming(false)  // Mark streaming as complete
-                    abortControllerRef.current = null  // Clear abort controller
-
                     // Handle cancellation
                     if (data.cancelled) {
+                      setLoading(false)  // Ensure loading is false when done
+                      setIsStreaming(false)  // Mark streaming as complete
+                      abortControllerRef.current = null  // Clear abort controller
                       // Add or update assistant message with cancellation notice
                       setMessages(prev => {
                         const newMessages = [...prev]
@@ -255,7 +254,12 @@ export function useChatMessage(
                       return
                     }
 
-                    // Mark streaming as complete for the assistant message
+                    // Process completion - update message ID if provided, otherwise just mark as complete
+                    setLoading(false)  // Ensure loading is false when done
+                    setIsStreaming(false)  // Mark streaming as complete
+                    abortControllerRef.current = null  // Clear abort controller
+
+                    // Mark streaming as complete for the assistant message and update ID if provided
                     setMessages(prev => {
                       const newMessages = [...prev]
                       const indexToUpdate = assistantMessageIndexRef.current !== null
@@ -272,7 +276,9 @@ export function useChatMessage(
                       if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
                         newMessages[indexToUpdate] = {
                           ...newMessages[indexToUpdate],
-                          streamingComplete: true
+                          streamingComplete: true,
+                          // Update ID if provided from server
+                          ...(data.message_id ? { id: String(data.message_id) } : {})
                         }
                       }
                       return newMessages

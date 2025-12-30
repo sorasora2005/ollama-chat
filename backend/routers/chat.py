@@ -115,6 +115,8 @@ async def generate_chat_stream(request: ChatRequest, db: Session):
                     return
                 
                 try:
+                    prompt_tokens = None
+                    completion_tokens = None
                     async for line in response.aiter_lines():
                         if not line:
                             continue
@@ -123,20 +125,32 @@ async def generate_chat_stream(request: ChatRequest, db: Session):
                             if "message" in chunk_data and "content" in chunk_data["message"]:
                                 content = chunk_data["message"]["content"]
                                 full_message += content
-                                yield f"data: {json.dumps({'content': content, 'session_id': session_id, 'done': chunk_data.get('done', False)})}\n\n"
+                                # Don't include 'done' in content chunks - it will be sent separately with message_id
+                                yield f"data: {json.dumps({'content': content, 'session_id': session_id})}\n\n"
+                            
+                            # Extract token counts from response
+                            if "prompt_eval_count" in chunk_data:
+                                prompt_tokens = chunk_data.get("prompt_eval_count")
+                            if "eval_count" in chunk_data:
+                                completion_tokens = chunk_data.get("eval_count")
                             
                             if chunk_data.get("done", False):
-                                # Save assistant response to database
+                                # Save assistant response to database with token counts
                                 assistant_msg = ChatMessage(
                                     user_id=request.user_id,
                                     session_id=session_id,
                                     role="assistant",
                                     content=full_message,
-                                    model=request.model
+                                    model=request.model,
+                                    prompt_tokens=prompt_tokens,
+                                    completion_tokens=completion_tokens
                                 )
                                 db.add(assistant_msg)
                                 db.commit()
+                                db.refresh(assistant_msg)  # Refresh to get the ID
                                 message_saved = True
+                                # Send final message with ID
+                                yield f"data: {json.dumps({'done': True, 'message_id': assistant_msg.id, 'session_id': session_id})}\n\n"
                                 break
                         except json.JSONDecodeError:
                             continue

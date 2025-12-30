@@ -23,7 +23,23 @@ class ChatMessage(Base):
     model = Column(String, index=True)  # Model name used
     images = Column(JSON, nullable=True)  # Base64 encoded images array
     is_cancelled = Column(Integer, default=0)  # Flag to indicate if generation was cancelled (0 = false, 1 = true)
+    prompt_tokens = Column(Integer, nullable=True)  # Number of prompt tokens
+    completion_tokens = Column(Integer, nullable=True)  # Number of completion tokens
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="messages")
+    feedbacks = relationship("MessageFeedback", back_populates="message", cascade="all, delete-orphan")
+
+class MessageFeedback(Base):
+    __tablename__ = "message_feedbacks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), index=True)
+    model = Column(String, index=True)  # Model name for easy aggregation
+    feedback_type = Column(String)  # "positive" or "negative"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User")
+    message = relationship("ChatMessage", back_populates="feedbacks")
 

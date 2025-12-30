@@ -28,6 +28,7 @@ import DownloadSuccessModal from './components/DownloadSuccessModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import ModelStatsModal from './components/ModelStatsModal'
 import FileList from './components/FileList'
+import StatsList from './components/StatsList'
 import { api } from './utils/api'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -370,6 +371,17 @@ export default function Home() {
     }
   }
 
+  // Handle feedback
+  const handleFeedback = async (messageId: number, feedbackType: 'positive' | 'negative') => {
+    if (!userId) return
+    try {
+      await api.createFeedback(userId, messageId, feedbackType)
+      showNotification(feedbackType === 'positive' ? 'フィードバックを送信しました（良い）' : 'フィードバックを送信しました（悪い）', 'success')
+    } catch (error: any) {
+      showNotification(`フィードバックの送信に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
+    }
+  }
+
   // Handle model stats
   const loadModelStats = async () => {
     try {
@@ -527,7 +539,12 @@ export default function Home() {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col min-h-0">
-          {pathname === '/files' ? (
+          {pathname === '/stats' ? (
+            <StatsList
+              userId={userId}
+              username={username}
+            />
+          ) : pathname === '/files' ? (
             <FileList
               files={userFiles}
               loading={loadingFiles}
@@ -549,8 +566,10 @@ export default function Home() {
               messagesEndRef={messagesEndRef}
               copiedIndex={copiedIndex}
               clickedButton={clickedButton}
+              userId={userId}
               onCopyMessage={handleCopyMessage}
               onRegenerateMessage={regenerateMessage}
+              onFeedback={handleFeedback}
             />
           )}
         </div>

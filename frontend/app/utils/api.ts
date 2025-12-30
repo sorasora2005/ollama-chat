@@ -91,5 +91,38 @@ export const api = {
     })
     return response.data
   },
+
+  // Feedback
+  createFeedback: async (userId: number, messageId: number, feedbackType: 'positive' | 'negative'): Promise<{
+    id: number
+    message: string
+  }> => {
+    const response = await axios.post(`${API_URL}/api/feedback`, {
+      user_id: userId,
+      message_id: messageId,
+      feedback_type: feedbackType
+    })
+    return response.data
+  },
+
+  getFeedbackStats: async (userId: number, model?: string): Promise<{
+    user_id: number
+    stats: Array<{
+      model: string
+      total_messages: number
+      total_prompt_tokens: number
+      total_completion_tokens: number
+      total_tokens: number
+      positive_feedback_count: number
+      negative_feedback_count: number
+      total_feedback_count: number
+    }>
+  }> => {
+    const url = model
+      ? `${API_URL}/api/feedback/stats/${userId}?model=${encodeURIComponent(model)}`
+      : `${API_URL}/api/feedback/stats/${userId}`
+    const response = await axios.get(url)
+    return response.data
+  },
 }
 

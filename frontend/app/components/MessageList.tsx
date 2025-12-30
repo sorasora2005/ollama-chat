@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Copy, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Copy, RotateCcw, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Message } from '../types'
 
 interface MessageListProps {
@@ -13,8 +13,10 @@ interface MessageListProps {
   messagesEndRef: React.RefObject<HTMLDivElement>
   copiedIndex: number | null
   clickedButton: { type: string, index: number } | null
+  userId: number | null
   onCopyMessage: (content: string, index: number) => void
   onRegenerateMessage: (index: number) => void
+  onFeedback?: (messageId: number, feedbackType: 'positive' | 'negative') => void
 }
 
 export default function MessageList({
@@ -26,10 +28,13 @@ export default function MessageList({
   messagesEndRef,
   copiedIndex,
   clickedButton,
+  userId,
   onCopyMessage,
   onRegenerateMessage,
+  onFeedback,
 }: MessageListProps) {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
+  const [feedbackStates, setFeedbackStates] = useState<Map<string, 'positive' | 'negative' | null>>(new Map())
 
   const toggleMessageExpansion = (messageId: string) => {
     setExpandedMessages(prev => {
@@ -70,7 +75,11 @@ export default function MessageList({
       {messages.map((message, index) => {
         const isNewAssistantMessage = message.role === 'assistant' && 
           (message.id?.startsWith('assistant-') || message.id?.startsWith('error-') || message.id?.startsWith('cancelled-'))
-        const isStreaming = loading && assistantMessageIndex === index
+        // Check if this message is currently streaming
+        // streamingComplete === false means actively streaming
+        // streamingComplete === undefined means loaded from history (not streaming)
+        // streamingComplete === true means streaming completed
+        const isStreaming = message.role === 'assistant' && message.streamingComplete === false
         const messageLength = message.content.replace(/\s+/g, '').length
         const isShortMessage = messageLength < 50
 
@@ -218,7 +227,7 @@ export default function MessageList({
                   </button>
                 </div>
               )}
-              {message.role === 'assistant' && !isStreaming && (message.streamingComplete === true || message.streamingComplete === undefined) && (
+              {message.role === 'assistant' && !isStreaming && (
                 <div className="flex items-center gap-1 mt-2">
                   <button
                     onClick={() => {
@@ -249,6 +258,66 @@ export default function MessageList({
                         : 'text-gray-600 dark:text-gray-400'
                     }`} />
                   </button>
+                  {userId && message.id && message.streamingComplete && !message.id.startsWith('error-') && !message.id.startsWith('cancelled-') && (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (onFeedback && message.id) {
+                            const messageId = parseInt(message.id)
+                            if (!isNaN(messageId)) {
+                              const feedbackType: 'positive' | 'negative' = 'positive'
+                              onFeedback(messageId, feedbackType)
+                              setFeedbackStates(prev => {
+                                const newMap = new Map(prev)
+                                newMap.set(message.id!, feedbackType)
+                                return newMap
+                              })
+                            }
+                          }
+                        }}
+                        className={`p-2 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg transition-all ${
+                          feedbackStates.get(message.id || '') === 'positive' 
+                            ? 'bg-blue-100 dark:bg-blue-900' 
+                            : ''
+                        }`}
+                        title="良い"
+                      >
+                        <ThumbsUp className={`w-4 h-4 transition-colors ${
+                          feedbackStates.get(message.id || '') === 'positive' 
+                            ? 'text-blue-500' 
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (onFeedback && message.id) {
+                            const messageId = parseInt(message.id)
+                            if (!isNaN(messageId)) {
+                              const feedbackType: 'positive' | 'negative' = 'negative'
+                              onFeedback(messageId, feedbackType)
+                              setFeedbackStates(prev => {
+                                const newMap = new Map(prev)
+                                newMap.set(message.id!, feedbackType)
+                                return newMap
+                              })
+                            }
+                          }
+                        }}
+                        className={`p-2 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg transition-all ${
+                          feedbackStates.get(message.id || '') === 'negative' 
+                            ? 'bg-red-100 dark:bg-red-900' 
+                            : ''
+                        }`}
+                        title="悪い"
+                      >
+                        <ThumbsDown className={`w-4 h-4 transition-colors ${
+                          feedbackStates.get(message.id || '') === 'negative' 
+                            ? 'text-red-500' 
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`} />
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
