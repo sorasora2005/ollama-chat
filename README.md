@@ -208,52 +208,85 @@ start.bat
 ## アーキテクチャ
 
 ```
-┌─────────────┐
-│  Frontend   │ Next.js (Port 3000)
-│  (Next.js)  │
-│             │
-│  - Components (UI) │
-│  - Hooks (Logic)   │
-│  - Utils (Helpers) │
-└──────┬──────┘
-       │
-       │ HTTP/REST API
-       │
-┌──────▼──────┐
-│  Backend    │ FastAPI (Port 8000)
-│  (FastAPI)  │
-│             │
-│  - Routers  │
-│    ├── api_keys.py│
-│    ├── chat.py    │
-│    ├── feedback.py│
-│    ├── models.py  │
-│    ├── notes.py   │
-│    ├── upload.py  │
-│    └── users.py   │
-└──────┬──────┘
-       │
-       ├───► PostgreSQL (Port 5432)
-       │     - ユーザー情報
-       │     - チャット履歴（トークン数含む）
-       │     - セッション管理
-       │     - ファイルメタデータ
-       │     - メッセージフィードバック
-       │     - ノート
-       │     - クラウドAPIキー
-       │
-       └───► Ollama (Port 11434)
-             - AIモデル実行
-             - ストリーミング応答
+┌─────────────────────────────────────────────┐
+│           Frontend (Next.js)                │ Port 3000
+│  ┌─────────────────────────────────────┐   │
+│  │         Components (UI)              │   │
+│  │  - MessageList, MessageInput         │   │
+│  │  - ModelList, ModelSelector          │   │
+│  │  - Modals, Sidebar, etc.            │   │
+│  └─────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────┐   │
+│  │    Custom Hooks (Business Logic)    │   │
+│  │  - useChat, useChatMessage          │   │
+│  │  - useMessageStreaming               │   │
+│  │  - useMessageCancellation            │   │
+│  │  - useMessageOperations              │   │
+│  │  - useModelManagement                │   │
+│  │  - useNoteManagement                 │   │
+│  │  - usePageRouter                     │   │
+│  └─────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────┐   │
+│  │       Utilities & API Client         │   │
+│  └─────────────────────────────────────┘   │
+└──────────────────┬──────────────────────────┘
+                   │
+                   │ HTTP/REST API
+                   │
+┌──────────────────▼──────────────────────────┐
+│           Backend (FastAPI)                 │ Port 8000
+│  ┌─────────────────────────────────────┐   │
+│  │      Routers (API Endpoints)         │   │
+│  │  - chat.py (Streaming)               │   │
+│  │  - models.py, notes.py               │   │
+│  │  - users.py, api_keys.py             │   │
+│  │  - feedback.py, upload.py            │   │
+│  └─────────────────┬───────────────────┘   │
+│                    │                         │
+│  ┌─────────────────▼───────────────────┐   │
+│  │         Services Layer               │   │
+│  │  - ChatService (Orchestration)       │   │
+│  │  - MessageRepository (DB Ops)        │   │
+│  │  - ModelDetector (Cloud Detection)   │   │
+│  │  - GeminiProvider (API Integration)  │   │
+│  └─────────────────────────────────────┘   │
+└──────────────────┬──────────────────────────┘
+                   │
+          ┌────────┴────────┐
+          │                 │
+    ┌─────▼─────┐    ┌─────▼─────┐
+    │PostgreSQL │    │  Ollama   │
+    │  (5432)   │    │  (11434)  │
+    │           │    │           │
+    │ - Users   │    │ - Models  │
+    │ - Messages│    │ - Streaming│
+    │ - Sessions│    └───────────┘
+    │ - Notes   │
+    │ - Files   │    ┌───────────────┐
+    │ - API Keys│    │ Cloud APIs    │
+    └───────────┘    │ - Gemini      │
+                     │ - GPT (Future)│
+                     │ - Claude      │
+                     └───────────────┘
 ```
 
 ### コード構造の特徴
 
 **フロントエンド**:
 - **コンポーネント分離**: UIコンポーネントを機能別に分離（`components/`）
+  - `ApiKeyManager`: 再利用可能なAPIキー管理モーダル
+  - `ModelList`, `ModelSelector`: モデル選択とダウンロード管理
+  - `MessageList`, `MessageInput`: チャットメッセージ表示と入力
+  - 各種モーダル、サイドバー、通知などのUIコンポーネント
 - **カスタムフック**: ビジネスロジックをカスタムフックに分離（`hooks/`）
   - `useChat`: チャット履歴とセッション管理
-  - `useChatMessage`: メッセージ送信とストリーミング処理
+  - `useChatMessage`: メッセージ送信とストリーミング処理のオーケストレーション
+  - `useMessageStreaming`: Ollama/Geminiのストリーミングレスポンス処理
+  - `useMessageCancellation`: メッセージ生成の中断とコンテンツ復元
+  - `useMessageOperations`: メッセージコピーと再生成
+  - `useModelManagement`: モデルフィルタリング、グループ化、クラウド検出
+  - `useNoteManagement`: ノート作成、検索、エクスポート
+  - `usePageRouter`: ルーティングとページ判定
   - `useCloudApiKeys`: クラウドAPIキーの管理
   - `useFiles`: ファイル管理
   - `useModelDownload`: モデルのダウンロード管理
@@ -267,13 +300,21 @@ start.bat
 **バックエンド**:
 - **ルーター分離**: APIエンドポイントを機能別に分離（`routers/`）
   - `api_keys.py`: クラウドAPIキー管理API
-  - `chat.py`: チャット関連API（トークン数の記録を含む）
+  - `chat.py`: チャット関連API（薄いルーティング層）
   - `feedback.py`: フィードバック送信と統計情報API
   - `models.py`: モデル管理API
   - `notes.py`: ノート管理API
   - `upload.py`: ファイルアップロードAPI
   - `users.py`: ユーザー管理API
-- **モジュール化**: 各ルーターが独立して管理され、`main.py`で統合
+- **サービス層**: ビジネスロジックをサービスクラスに分離（`services/`）
+  - `ChatService`: チャット処理のオーケストレーション（Ollama/クラウドルーティング）
+  - `MessageRepository`: メッセージのデータベース操作
+  - `ModelDetector`: クラウドモデル検出ロジック
+  - `cloud_providers/`: クラウドAPIプロバイダー
+    - `CloudProviderBase`: 抽象基底クラス
+    - `GeminiProvider`: Gemini API実装
+    - 将来的にGPT、Claude、Grokなどを追加可能
+- **クリーンアーキテクチャ**: ルーター → サービス → リポジトリ → DBの明確な分離
 
 ## 対応ファイル形式
 
@@ -332,12 +373,19 @@ ollama-chat/
 │   ├── Dockerfile          # バックエンドDockerfile
 │   ├── routers/            # APIルーター（機能別に分離）
 │   │   ├── api_keys.py    # クラウドAPIキー管理エンドポイント
-│   │   ├── chat.py        # チャット関連エンドポイント
+│   │   ├── chat.py        # チャット関連エンドポイント（薄いルーティング層）
 │   │   ├── feedback.py    # フィードバック関連エンドポイント
 │   │   ├── models.py      # モデル管理エンドポイント
 │   │   ├── notes.py       # ノート管理エンドポイント
 │   │   ├── upload.py      # ファイルアップロードエンドポイント
 │   │   └── users.py       # ユーザー管理エンドポイント
+│   ├── services/           # サービス層（ビジネスロジック）
+│   │   ├── chat_service.py      # チャット処理オーケストレーション
+│   │   ├── message_repository.py # メッセージDB操作
+│   │   ├── model_detector.py     # クラウドモデル検出
+│   │   └── cloud_providers/      # クラウドプロバイダー実装
+│   │       ├── base.py           # 抽象基底クラス
+│   │       └── gemini.py         # Gemini API実装
 │   ├── utils/             # ユーティリティ関数
 │   │   └── model_utils.py # モデル関連ユーティリティ
 │   └── alembic/           # データベースマイグレーション
@@ -349,6 +397,7 @@ ollama-chat/
 │   │   ├── icon.png        # アプリケーションアイコン
 │   │   ├── apple-icon.png  # Apple用アイコン
 │   │   ├── components/     # Reactコンポーネント（機能別に分離）
+│   │   │   ├── ApiKeyManager.tsx        # APIキー管理モーダル（再利用可能）
 │   │   │   ├── CloudModelFamily.tsx
 │   │   │   ├── DeleteConfirmModal.tsx
 │   │   │   ├── DownloadSuccessModal.tsx
@@ -372,15 +421,21 @@ ollama-chat/
 │   │   │   ├── UsernameModal.tsx
 │   │   │   └── WelcomeScreen.tsx
 │   │   ├── hooks/          # カスタムフック（ロジックの分離）
-│   │   │   ├── useChat.ts
-│   │   │   ├── useChatMessage.ts
-│   │   │   ├── useCloudApiKeys.ts
-│   │   │   ├── useFiles.ts
-│   │   │   ├── useModelDownload.ts
-│   │   │   ├── useModels.ts
-│   │   │   ├── useNotifications.ts
-│   │   │   ├── useTheme.ts
-│   │   │   └── useUsers.ts
+│   │   │   ├── useChat.ts              # チャット履歴とセッション管理
+│   │   │   ├── useChatMessage.ts       # メッセージ送信オーケストレーション
+│   │   │   ├── useMessageStreaming.ts  # ストリーミングレスポンス処理
+│   │   │   ├── useMessageCancellation.ts # 生成中断とコンテンツ復元
+│   │   │   ├── useMessageOperations.ts # コピーと再生成
+│   │   │   ├── useModelManagement.ts   # モデルユーティリティ
+│   │   │   ├── useNoteManagement.ts    # ノート操作
+│   │   │   ├── usePageRouter.ts        # ページルーティング
+│   │   │   ├── useCloudApiKeys.ts      # APIキー管理
+│   │   │   ├── useFiles.ts             # ファイル管理
+│   │   │   ├── useModelDownload.ts     # モデルダウンロード
+│   │   │   ├── useModels.ts            # モデル一覧と選択
+│   │   │   ├── useNotifications.ts     # 通知管理
+│   │   │   ├── useTheme.ts             # テーマ管理
+│   │   │   └── useUsers.ts             # ユーザー管理
 │   │   ├── utils/          # ユーティリティ関数
 │   │   │   ├── api.ts      # APIクライアント
 │   │   │   ├── chatExport.ts

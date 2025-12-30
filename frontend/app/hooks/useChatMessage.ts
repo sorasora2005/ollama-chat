@@ -1,7 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { Message } from '../types'
 import { api } from '../utils/api'
 import { scrollToBottom, scrollToLastSentMessage } from '../utils/scrollUtils'
+import { useMessageStreaming } from './useMessageStreaming'
+import { useMessageCancellation } from './useMessageCancellation'
+import { useMessageOperations } from './useMessageOperations'
 
 export function useChatMessage(
   userId: number | null,
@@ -19,52 +22,15 @@ export function useChatMessage(
   loadSessions: (id: number) => Promise<void>,
   loadUserFiles: (id: number) => Promise<void>
 ) {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
-  const [clickedButton, setClickedButton] = useState<{ type: string, index: number } | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
-  const lastSentMessageContentRef = useRef<{ text: string, file: { filename: string, images: string[] } | null } | null>(null)
+
+  // Use extracted hooks
+  const { streamGeminiTypingAnimation, updateStreamingMessage, completeStreaming } = useMessageStreaming()
+  const { saveMessageContent, cancelStreaming: doCancelStreaming, clearSavedContent } = useMessageCancellation()
+  const { copiedIndex, clickedButton, setClickedButton, copyMessage, regenerateMessage: doRegenerateMessage } = useMessageOperations()
 
   const cancelStreaming = (): { text: string, file: { filename: string, images: string[] } | null } | null => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-      setLoading(false)
-      setIsStreaming(false)
-      // Add or update assistant message with cancellation notice
-      setMessages(prev => {
-        const newMessages = [...prev]
-        const lastMessage = newMessages[newMessages.length - 1]
-        if (lastMessage && lastMessage.role === 'assistant') {
-          // Update existing assistant message
-          const indexToUpdate = assistantMessageIndexRef.current !== null
-            ? assistantMessageIndexRef.current
-            : newMessages.length - 1
-          if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
-            newMessages[indexToUpdate] = {
-              ...newMessages[indexToUpdate],
-              content: newMessages[indexToUpdate].content.trim() || '生成途中でキャンセルされました。',
-              streamingComplete: true,
-              is_cancelled: true
-            }
-          }
-        } else {
-          // Add new cancellation message
-          const cancellationMessage: Message = {
-            role: 'assistant',
-            content: '生成途中でキャンセルされました。',
-            id: `cancelled-${Date.now()}-${Math.random()}`,
-            streamingComplete: true,
-            is_cancelled: true
-          }
-          newMessages.push(cancellationMessage)
-        }
-        return newMessages
-      })
-      assistantMessageIndexRef.current = null
-      // Return the last sent message content for restoration
-      return lastSentMessageContentRef.current
-    }
-    return null
+    return doCancelStreaming(abortControllerRef, setMessages, setLoading, setIsStreaming, assistantMessageIndexRef)
   }
 
   const sendMessage = async (
@@ -81,10 +47,7 @@ export function useChatMessage(
     }
 
     // Save the message content and file for potential restoration on cancel
-    lastSentMessageContentRef.current = {
-      text: textToSend || (uploadedFile ? `この画像について説明してください。` : ''),
-      file: uploadedFile
-    }
+    saveMessageContent(textToSend, uploadedFile)
 
     const userMessage: Message = {
       role: 'user',
@@ -156,125 +119,63 @@ export function useChatMessage(
 
                   // Typing animation for non-streaming (Gemini)
                   if (data.content && data.done) {
-                    const fullText = data.content
-                    let animatedContent = ''
-
-                    // Create assistant message with empty content
-                    const assistantMessage: Message = {
-                      role: 'assistant',
-                      content: '',
-                      model: selectedModel,
-                      session_id: data.session_id || currentSessionId || undefined,
-                      id: `assistant-${Date.now()}-${Math.random()}`,
-                      streamingComplete: false
-                    }
-                    setMessages(prev => {
-                      const newIndex = prev.length
-                      assistantMessageIndexRef.current = newIndex
-                      return [...prev, assistantMessage]
-                    })
-                    setLoading(false)
-                    setIsStreaming(true)
-
-                    const typingInterval = setInterval(() => {
-                      animatedContent = fullText.slice(0, animatedContent.length + 1)
-                      setMessages(prev => {
-                        const newMessages = [...prev]
-                        const indexToUpdate = assistantMessageIndexRef.current
-                        if (indexToUpdate !== null && newMessages[indexToUpdate]) {
-                          newMessages[indexToUpdate] = {
-                            ...newMessages[indexToUpdate],
-                            content: animatedContent
-                          }
-                        }
-                        return newMessages
-                      })
-                      scrollToBottom(messagesEndRef)
-
-                      if (animatedContent.length === fullText.length) {
-                        clearInterval(typingInterval)
-                        setIsStreaming(false)
-                        abortControllerRef.current = null
-                        setMessages(prev => {
-                          const newMessages = [...prev]
-                          const indexToUpdate = assistantMessageIndexRef.current
-                          if (indexToUpdate !== null && newMessages[indexToUpdate]) {
-                            newMessages[indexToUpdate] = {
-                              ...newMessages[indexToUpdate],
-                              streamingComplete: true,
-                              ...(data.message_id ? { id: String(data.message_id) } : {})
-                            }
-                          }
-                          return newMessages
-                        })
+                    streamGeminiTypingAnimation(
+                      data.content,
+                      selectedModel,
+                      currentSessionId,
+                      data.session_id,
+                      data.message_id,
+                      setMessages,
+                      setLoading,
+                      setIsStreaming,
+                      assistantMessageIndexRef,
+                      abortControllerRef,
+                      messagesEndRef,
+                      async () => {
                         if (data.session_id && !currentSessionId) {
                           setCurrentSessionId(data.session_id)
                         }
-                        loadSessions(userId)
-                        loadUserFiles(userId)
-                        lastSentMessageContentRef.current = null
+                        await loadSessions(userId)
+                        await loadUserFiles(userId)
+                        clearSavedContent()
                       }
-                    }, 10) // Typing speed
+                    )
                     continue; // Skip other processing for this line
                   }
 
                   // Handle streaming content (Ollama)
                   if (data.content) {
-                    // Create assistant message on first content chunk
                     if (!assistantMessageCreated) {
                       assistantMessageCreated = true
-                      fullContent = data.content
-                      setIsStreaming(true)  // Mark as streaming
-                      const assistantMessage: Message = {
-                        role: 'assistant',
-                        content: fullContent,
-                        model: selectedModel,
-                        session_id: data.session_id || currentSessionId || undefined,
-                        id: `assistant-${Date.now()}-${Math.random()}`,
-                        streamingComplete: false
-                      }
-                      setMessages(prev => {
-                        // Track the index of the assistant message we're creating
-                        const newIndex = prev.length
-                        assistantMessageIndexRef.current = newIndex
-                        return [...prev, assistantMessage]
-                      })
-                      setLoading(false)  // Hide loading indicator once message starts streaming
-                      // Auto-scroll during streaming
-                      setTimeout(() => scrollToBottom(messagesEndRef), 50)
+                      fullContent = updateStreamingMessage(
+                        data.content,
+                        true,
+                        selectedModel,
+                        data.session_id,
+                        currentSessionId,
+                        setMessages,
+                        setLoading,
+                        setIsStreaming,
+                        assistantMessageIndexRef,
+                        messagesEndRef
+                      )
                       if (data.session_id) {
                         sessionId = data.session_id
                       }
                     } else {
-                      // Update existing assistant message
-                      // Add new content to the accumulated content
                       fullContent += data.content
-                      setMessages(prev => {
-                        const newMessages = [...prev]
-                        // Use the tracked index if available, otherwise find the last assistant message
-                        const indexToUpdate = assistantMessageIndexRef.current !== null
-                          ? assistantMessageIndexRef.current
-                          : (() => {
-                            for (let i = newMessages.length - 1; i >= 0; i--) {
-                              if (newMessages[i].role === 'assistant') {
-                                return i
-                              }
-                            }
-                            return -1
-                          })()
-
-                        if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
-                          // Use the accumulated fullContent directly to ensure consistency
-                          newMessages[indexToUpdate] = {
-                            ...newMessages[indexToUpdate],
-                            content: fullContent,
-                            session_id: data.session_id || newMessages[indexToUpdate].session_id
-                          }
-                        }
-                        return newMessages
-                      })
-                      // Auto-scroll during streaming
-                      setTimeout(() => scrollToBottom(messagesEndRef), 50)
+                      updateStreamingMessage(
+                        fullContent,
+                        false,
+                        selectedModel,
+                        data.session_id,
+                        currentSessionId,
+                        setMessages,
+                        setLoading,
+                        setIsStreaming,
+                        assistantMessageIndexRef,
+                        messagesEndRef
+                      )
                       if (data.session_id) {
                         sessionId = data.session_id
                       }
@@ -321,43 +222,15 @@ export function useChatMessage(
                       return
                     }
 
-                    // Process completion - update message ID if provided, otherwise just mark as complete
-                    setLoading(false)  // Ensure loading is false when done
-                    setIsStreaming(false)  // Mark streaming as complete
-                    abortControllerRef.current = null  // Clear abort controller
-
-                    // Mark streaming as complete for the assistant message and update ID if provided
-                    setMessages(prev => {
-                      const newMessages = [...prev]
-                      const indexToUpdate = assistantMessageIndexRef.current !== null
-                        ? assistantMessageIndexRef.current
-                        : (() => {
-                          for (let i = newMessages.length - 1; i >= 0; i--) {
-                            if (newMessages[i].role === 'assistant') {
-                              return i
-                            }
-                          }
-                          return -1
-                        })()
-
-                      if (indexToUpdate >= 0 && indexToUpdate < newMessages.length) {
-                        newMessages[indexToUpdate] = {
-                          ...newMessages[indexToUpdate],
-                          streamingComplete: true,
-                          // Update ID if provided from server
-                          ...(data.message_id ? { id: String(data.message_id) } : {})
-                        }
-                      }
-                      return newMessages
-                    })
+                    // Process completion
+                    completeStreaming(data.message_id, setMessages, setLoading, setIsStreaming, assistantMessageIndexRef, abortControllerRef)
 
                     if (sessionId && !currentSessionId) {
                       setCurrentSessionId(sessionId)
                     }
                     await loadSessions(userId)
                     await loadUserFiles(userId)
-                    // Clear the saved message content after successful completion
-                    lastSentMessageContentRef.current = null
+                    clearSavedContent()
                     break
                   }
                 } catch (e) {
@@ -452,7 +325,7 @@ export function useChatMessage(
       assistantMessageIndexRef.current = null  // Reset on error
       abortControllerRef.current = null
       // Clear saved message content on error (not cancellation)
-      lastSentMessageContentRef.current = null
+      clearSavedContent()
 
       // If user not found, clear localStorage and show username modal
       if (error.message?.includes('User not found') || error.message?.includes('404')) {
@@ -474,36 +347,8 @@ export function useChatMessage(
     }
   }
 
-  const copyMessage = async (content: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(content)
-      setCopiedIndex(index)
-      setTimeout(() => setCopiedIndex(null), 2000)
-      return true
-    } catch (error) {
-      console.error('Failed to copy:', error)
-      return false
-    }
-  }
-
   const regenerateMessage = async (messageIndex: number) => {
-    if (!userId) return
-
-    // Find the user message that prompted this assistant message
-    const userMessageIndex = messageIndex > 0 ? messageIndex - 1 : 0
-    const userMessage = messages[userMessageIndex]
-
-    if (!userMessage || userMessage.role !== 'user') return
-
-    // Remove messages from this assistant message onwards
-    const newMessages = messages.slice(0, messageIndex)
-    setMessages(newMessages)
-
-    // Wait a bit for state to update before sending
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    // Send the user message again, but skip adding the user message since it's already in the array
-    await sendMessage(userMessage.content, userMessage.images ? { filename: '', images: userMessage.images } : null, true)
+    await doRegenerateMessage(messageIndex, messages, userId, setMessages, sendMessage)
   }
 
   return {

@@ -7,10 +7,12 @@ import { useCloudApiKeys } from '../hooks/useCloudApiKeys'
 import { useModels } from '../hooks/useModels'
 import { useModelDownload } from '../hooks/useModelDownload'
 import { useNotifications } from '../hooks/useNotifications'
+import { useModelManagement } from '../hooks/useModelManagement'
 import DownloadWarningModal from './DownloadWarningModal'
 import DownloadSuccessModal from './DownloadSuccessModal'
 import DeleteConfirmModal from './DeleteConfirmModal'
 import CloudModelFamily from './CloudModelFamily'
+import ApiKeyManager from './ApiKeyManager'
 
 interface ModelListProps {
   userId: number | null
@@ -25,12 +27,12 @@ export default function ModelList({ userId }: ModelListProps) {
   const [expandedCloud, setExpandedCloud] = useState(true)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'gpt' | 'grok' | 'claude' | null>(null)
-  const [apiKeyInput, setApiKeyInput] = useState('')
   const [updatingApiProvider, setUpdatingApiProvider] = useState<string | null>(null)
 
   const { apiKeys, saveApiKey, deleteApiKey, hasApiKey, loading: apiKeysLoading } = useCloudApiKeys(userId)
   const { models, loadModels, downloadingModels, setDownloadingModels, deletingModels, setDeletingModels } = useModels()
   const { showNotification } = useNotifications()
+  const { filterModels, isCloudModel, groupModelsByFamily, getFamilyDisplayName, getApiProvider } = useModelManagement()
 
   const {
     showDownloadWarning,
@@ -57,94 +59,22 @@ export default function ModelList({ userId }: ModelListProps) {
     showNotification
   )
 
-  const filterModels = (modelList: Model[]) => {
-    if (!modelSearchQuery || !modelSearchQuery.trim()) return modelList
-    const query = modelSearchQuery.toLowerCase().trim()
-    if (!query) return modelList
-
-    return modelList.filter(m => {
-      if (!m) return false
-      const nameMatch = m.name?.toLowerCase().includes(query) || false
-      const descMatch = m.description?.toLowerCase().includes(query) || false
-      const familyMatch = m.family?.toLowerCase().includes(query) || false
-      const typeMatch = m.type?.toLowerCase().includes(query) || false
-      return nameMatch || descMatch || familyMatch || typeMatch
-    })
-  }
-
-  // Check if model is a cloud model (no download required)
-  const isCloudModel = (model: Model) => {
-    if (!model) return false
-    const nameLower = model.name?.toLowerCase() || ''
-    const familyLower = model.family?.toLowerCase() || ''
-    return familyLower === 'gemini' || familyLower === 'gpt' ||
-      familyLower === 'claude' || familyLower === 'grok' ||
-      nameLower.includes('gemini') || nameLower.includes('gpt-') ||
-      nameLower.includes('claude') || nameLower.includes('grok')
-  }
-
-  // Group models by family
-  const groupModelsByFamily = (modelList: Model[]) => {
-    const grouped: Record<string, Model[]> = {}
-    modelList.forEach(model => {
-      if (!model) return
-      const family = model.family || 'other'
-      if (!grouped[family]) {
-        grouped[family] = []
-      }
-      grouped[family].push(model)
-    })
-    return grouped
-  }
-
-  // Get family display name
-  const getFamilyDisplayName = (family: string) => {
-    const familyMap: Record<string, string> = {
-      'gemini': 'Gemini',
-      'gpt': 'GPT',
-      'grok': 'Grok',
-      'claude': 'Claude',
-      'qwen': 'Qwen',
-      'llama': 'Llama',
-      'gemma': 'Gemma',
-      'phi': 'Phi',
-      'mistral': 'Mistral',
-      'deepseek': 'DeepSeek',
-      'other': 'その他',
-    }
-    return familyMap[family.toLowerCase()] || family
-  }
-
-  // Get API provider from model family
-  const getApiProvider = (family: string): 'gemini' | 'gpt' | 'grok' | 'claude' | null => {
-    const familyLower = family.toLowerCase()
-    if (familyLower === 'gemini') return 'gemini'
-    if (familyLower === 'gpt') return 'gpt'
-    if (familyLower === 'grok') return 'grok'
-    if (familyLower === 'claude') return 'claude'
-    return null
-  }
-
   const handleOpenApiKeyModal = (provider: 'gemini' | 'gpt' | 'grok' | 'claude') => {
     setSelectedProvider(provider)
-    setApiKeyInput(apiKeys[provider] || '')
     setShowApiKeyModal(true)
   }
 
-  const handleSaveApiKey = async () => {
-    if (selectedProvider && apiKeyInput.trim()) {
-      setUpdatingApiProvider(selectedProvider)
-      try {
-        await saveApiKey(selectedProvider, apiKeyInput.trim())
-        setShowApiKeyModal(false)
-        setSelectedProvider(null)
-        setApiKeyInput('')
-        showNotification(`${getFamilyDisplayName(selectedProvider)}のAPIキーを登録しました`, 'success')
-      } catch (error: any) {
-        showNotification(`APIキーの登録に失敗しました: ${error.message || error.response?.data?.detail || '不明なエラー'}`, 'error')
-      } finally {
-        setUpdatingApiProvider(null)
-      }
+  const handleSaveApiKey = async (provider: 'gemini' | 'gpt' | 'grok' | 'claude', apiKey: string) => {
+    setUpdatingApiProvider(provider)
+    try {
+      await saveApiKey(provider, apiKey)
+      setShowApiKeyModal(false)
+      setSelectedProvider(null)
+      showNotification(`${getFamilyDisplayName(provider)}のAPIキーを登録しました`, 'success')
+    } catch (error: any) {
+      showNotification(`APIキーの登録に失敗しました: ${error.message || error.response?.data?.detail || '不明なエラー'}`, 'error')
+    } finally {
+      setUpdatingApiProvider(null)
     }
   }
 
@@ -192,9 +122,9 @@ export default function ModelList({ userId }: ModelListProps) {
     return true
   })
 
-  const downloadedModels = filterModels(allDownloaded)
-  const availableModels = filterModels(allAvailable)
-  const filteredCloudModels = filterModels(cloudModels)
+  const downloadedModels = filterModels(allDownloaded, modelSearchQuery)
+  const availableModels = filterModels(allAvailable, modelSearchQuery)
+  const filteredCloudModels = filterModels(cloudModels, modelSearchQuery)
 
   // Group models by family
   const downloadedGrouped = useMemo(() => groupModelsByFamily(downloadedModels), [downloadedModels])
@@ -465,60 +395,18 @@ export default function ModelList({ userId }: ModelListProps) {
       )}
 
       {/* API Key Modal */}
-      {showApiKeyModal && selectedProvider && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#2d2d2d] rounded-lg max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-black dark:text-white">
-                {getFamilyDisplayName(selectedProvider)} APIキーを登録
-              </h3>
-              <button
-                onClick={() => {
-                  setShowApiKeyModal(false)
-                  setSelectedProvider(null)
-                  setApiKeyInput('')
-                }}
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                APIキー
-              </label>
-              <input
-                type="password"
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder={`${getFamilyDisplayName(selectedProvider)} APIキーを入力`}
-                className="w-full px-3 py-2 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-black dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => {
-                  setShowApiKeyModal(false)
-                  setSelectedProvider(null)
-                  setApiKeyInput('')
-                }}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={handleSaveApiKey}
-                disabled={!apiKeyInput.trim() || !!updatingApiProvider}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600/80 to-purple-600/80 hover:from-blue-600 hover:to-purple-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-              >
-                {updatingApiProvider === selectedProvider && <Loader2 className="w-4 h-4 animate-spin" />}
-                {updatingApiProvider === selectedProvider ? 'テスト中...' : '保存'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ApiKeyManager
+        isOpen={showApiKeyModal}
+        provider={selectedProvider}
+        initialValue={selectedProvider ? (apiKeys[selectedProvider] || '') : ''}
+        isUpdating={selectedProvider ? updatingApiProvider === selectedProvider : false}
+        onClose={() => {
+          setShowApiKeyModal(false)
+          setSelectedProvider(null)
+        }}
+        onSave={handleSaveApiKey}
+        getFamilyDisplayName={getFamilyDisplayName}
+      />
 
       {/* Modals */}
       <DownloadWarningModal

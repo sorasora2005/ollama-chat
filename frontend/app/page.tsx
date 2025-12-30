@@ -12,6 +12,8 @@ import { useFiles } from './hooks/useFiles'
 import { useModelDownload } from './hooks/useModelDownload'
 import { useChatMessage } from './hooks/useChatMessage'
 import { useNotifications } from './hooks/useNotifications'
+import { usePageRouter } from './hooks/usePageRouter'
+import { useNoteManagement } from './hooks/useNoteManagement'
 import { exportChatHistory, exportNote } from './utils/chatExport'
 import { scrollToBottom } from './utils/scrollUtils'
 import UsernameModal from './components/UsernameModal'
@@ -56,15 +58,6 @@ export default function Home() {
     conversation_count: number
   }> | null>(null)
   const [showModelStats, setShowModelStats] = useState(false)
-  const [notes, setNotes] = useState<Note[]>([])
-  const [loadingNotes, setLoadingNotes] = useState(false)
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null)
-  const [showNoteCreateModal, setShowNoteCreateModal] = useState(false)
-  const [noteSearchQuery, setNoteSearchQuery] = useState('')
-  const [noteSearchResults, setNoteSearchResults] = useState<Note[]>([])
-  const [noteSearchLoading, setNoteSearchLoading] = useState(false)
-  const [showNoteSearch, setShowNoteSearch] = useState(false)
-  const noteSearchInputRef = useRef<HTMLInputElement>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -192,6 +185,29 @@ export default function Home() {
     loadUserFiles
   )
 
+  // Page routing
+  const { currentPage } = usePageRouter(pathname)
+
+  // Note management
+  const {
+    notes,
+    loadingNotes,
+    selectedNote,
+    setSelectedNote,
+    showNoteCreateModal,
+    setShowNoteCreateModal,
+    noteSearchQuery,
+    setNoteSearchQuery,
+    noteSearchResults,
+    noteSearchLoading,
+    showNoteSearch,
+    setShowNoteSearch,
+    noteSearchInputRef,
+    loadNotes,
+    handleCreateNote,
+    handleExportNote,
+  } = useNoteManagement(userId, currentSessionId, pathname, username, showNotification)
+
   // Initialize
   useEffect(() => {
     const savedUserId = localStorage.getItem('userId')
@@ -233,63 +249,6 @@ export default function Home() {
     }
   }, [pathname, userId])
 
-  // Load notes when accessing /notes page
-  const loadNotes = async () => {
-    if (!userId) return
-    setLoadingNotes(true)
-    try {
-      const notesData = await api.getNotes(userId)
-      setNotes(notesData)
-    } catch (error: any) {
-      console.error('Failed to load notes:', error)
-      showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
-    } finally {
-      setLoadingNotes(false)
-    }
-  }
-
-  useEffect(() => {
-    if (pathname === '/notes' && userId && !loadingNotes) {
-      loadNotes()
-    }
-  }, [pathname, userId])
-
-  // Handle note search
-  const handleNoteSearch = async (query: string) => {
-    if (!userId || !query.trim()) {
-      setNoteSearchResults([])
-      return
-    }
-
-    setNoteSearchLoading(true)
-    try {
-      const results = await api.searchNotes(userId, query)
-      setNoteSearchResults(results)
-    } catch (error) {
-      console.error('Failed to search notes:', error)
-      setNoteSearchResults([])
-    } finally {
-      setNoteSearchLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!userId || pathname !== '/notes') return
-    const timeoutId = setTimeout(() => {
-      if (noteSearchQuery) {
-        handleNoteSearch(noteSearchQuery)
-      } else {
-        setNoteSearchResults([])
-      }
-    }, 300)
-    return () => clearTimeout(timeoutId)
-  }, [noteSearchQuery, userId, pathname])
-
-  useEffect(() => {
-    if (showNoteSearch && noteSearchInputRef.current) {
-      noteSearchInputRef.current.focus()
-    }
-  }, [showNoteSearch])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -479,46 +438,6 @@ export default function Home() {
     }
   }
 
-  // Handle export note
-  const handleExportNote = (note: Note) => {
-    try {
-      exportNote(note, username)
-      showNotification('ノートをエクスポートしました', 'success')
-    } catch (error: any) {
-      showNotification(error.message || 'エクスポートするノートがありません', 'error')
-    }
-  }
-
-  // Handle create note
-  const handleCreateNote = async (model: string, prompt: string) => {
-    if (!userId || !currentSessionId) {
-      showNotification('ノートを作成するにはチャットセッションが必要です', 'error')
-      return
-    }
-
-    try {
-      await api.createNote({
-        user_id: userId,
-        session_id: currentSessionId,
-        model: model,
-        prompt: prompt,
-      })
-      showNotification('ノートを作成しました。生成中です...', 'success')
-      // Refresh notes if on notes page
-      if (pathname === '/notes') {
-        await loadNotes()
-      }
-      // Poll for note completion
-      setTimeout(async () => {
-        if (pathname === '/notes') {
-          await loadNotes()
-        }
-      }, 5000)
-    } catch (error: any) {
-      showNotification(`ノートの作成に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
-      throw error
-    }
-  }
 
   // Handle click outside model selector
   useEffect(() => {
