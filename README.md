@@ -195,6 +195,10 @@ start.bat
 ┌─────────────┐
 │  Frontend   │ Next.js (Port 3000)
 │  (Next.js)  │
+│             │
+│  - Components (UI) │
+│  - Hooks (Logic)   │
+│  - Utils (Helpers) │
 └──────┬──────┘
        │
        │ HTTP/REST API
@@ -202,6 +206,12 @@ start.bat
 ┌──────▼──────┐
 │  Backend    │ FastAPI (Port 8000)
 │  (FastAPI)  │
+│             │
+│  - Routers  │
+│    ├── chat.py    │
+│    ├── models.py  │
+│    ├── upload.py  │
+│    └── users.py   │
 └──────┬──────┘
        │
        ├───► PostgreSQL (Port 5432)
@@ -214,6 +224,28 @@ start.bat
              - AIモデル実行
              - ストリーミング応答
 ```
+
+### コード構造の特徴
+
+**フロントエンド**:
+- **コンポーネント分離**: UIコンポーネントを機能別に分離（`components/`）
+- **カスタムフック**: ビジネスロジックをカスタムフックに分離（`hooks/`）
+  - `useChat`: チャット履歴とセッション管理
+  - `useChatMessage`: メッセージ送信とストリーミング処理
+  - `useModels`: モデル一覧と選択管理
+  - `useFiles`: ファイル管理
+  - `useUsers`: ユーザー管理
+  - その他、テーマ、通知、モデルダウンロードなどの機能別フック
+- **ユーティリティ**: APIクライアント、エクスポート、スクロールなどの共通処理（`utils/`）
+- **型定義**: TypeScript型定義を一元管理（`types/`）
+
+**バックエンド**:
+- **ルーター分離**: APIエンドポイントを機能別に分離（`routers/`）
+  - `chat.py`: チャット関連API
+  - `models.py`: モデル管理API
+  - `upload.py`: ファイルアップロードAPI
+  - `users.py`: ユーザー管理API
+- **モジュール化**: 各ルーターが独立して管理され、`main.py`で統合
 
 ## 対応ファイル形式
 
@@ -262,27 +294,73 @@ start.bat
 ```
 ollama-chat/
 ├── backend/                 # バックエンド（FastAPI）
-│   ├── main.py             # メインアプリケーション
+│   ├── main.py             # メインアプリケーション（ルーターの統合）
 │   ├── models.py           # データベースモデル
 │   ├── schemas.py          # Pydanticスキーマ
 │   ├── database.py         # データベース接続設定
 │   ├── file_converter.py   # ファイル変換処理
+│   ├── config.py           # 設定ファイル
 │   ├── requirements.txt    # Python依存関係
 │   ├── Dockerfile          # バックエンドDockerfile
-│   └── alembic/            # データベースマイグレーション
+│   ├── routers/            # APIルーター（機能別に分離）
+│   │   ├── chat.py        # チャット関連エンドポイント
+│   │   ├── models.py      # モデル管理エンドポイント
+│   │   ├── upload.py      # ファイルアップロードエンドポイント
+│   │   └── users.py       # ユーザー管理エンドポイント
+│   ├── utils/             # ユーティリティ関数
+│   │   └── model_utils.py # モデル関連ユーティリティ
+│   └── alembic/           # データベースマイグレーション
 ├── frontend/               # フロントエンド（Next.js）
 │   ├── app/
 │   │   ├── page.tsx        # メインチャットページ
 │   │   ├── layout.tsx      # レイアウト設定
+│   │   ├── globals.css     # グローバルスタイル
 │   │   ├── icon.png        # アプリケーションアイコン
 │   │   ├── apple-icon.png  # Apple用アイコン
+│   │   ├── components/     # Reactコンポーネント（機能別に分離）
+│   │   │   ├── DeleteConfirmModal.tsx
+│   │   │   ├── DownloadSuccessModal.tsx
+│   │   │   ├── DownloadWarningModal.tsx
+│   │   │   ├── FileList.tsx
+│   │   │   ├── FilePreviewModal.tsx
+│   │   │   ├── MessageInput.tsx
+│   │   │   ├── MessageList.tsx
+│   │   │   ├── ModelSelector.tsx
+│   │   │   ├── ModelStatsModal.tsx
+│   │   │   ├── NotificationToast.tsx
+│   │   │   ├── SearchModal.tsx
+│   │   │   ├── Sidebar.tsx
+│   │   │   ├── TopBar.tsx
+│   │   │   ├── UsernameModal.tsx
+│   │   │   └── WelcomeScreen.tsx
+│   │   ├── hooks/          # カスタムフック（ロジックの分離）
+│   │   │   ├── useChat.ts
+│   │   │   ├── useChatMessage.ts
+│   │   │   ├── useFiles.ts
+│   │   │   ├── useModelDownload.ts
+│   │   │   ├── useModels.ts
+│   │   │   ├── useNotifications.ts
+│   │   │   ├── useTheme.ts
+│   │   │   └── useUsers.ts
+│   │   ├── utils/          # ユーティリティ関数
+│   │   │   ├── api.ts      # APIクライアント
+│   │   │   ├── chatExport.ts
+│   │   │   ├── modelSize.ts
+│   │   │   └── scrollUtils.ts
+│   │   ├── types/          # TypeScript型定義
+│   │   │   └── index.ts
 │   │   └── files/          # ファイル管理ページ
+│   │       └── page.tsx
 │   ├── package.json        # Node.js依存関係
+│   ├── next.config.js      # Next.js設定
+│   ├── tailwind.config.js  # Tailwind CSS設定
+│   ├── tsconfig.json       # TypeScript設定
 │   └── Dockerfile          # フロントエンドDockerfile
 ├── docker-compose.yml      # Docker Compose設定
 ├── start.sh               # 起動スクリプト（macOS/Linux）
 ├── start.bat              # 起動スクリプト（Windows）
-└── README.md              # このファイル
+├── README.md              # このファイル
+└── SETUP.md               # 詳細セットアップガイド
 ```
 
 ## 開発
@@ -297,6 +375,10 @@ uvicorn main:app --reload
 
 バックエンドは `http://localhost:8000` で起動します。APIドキュメントは `http://localhost:8000/docs` で確認できます。
 
+**コード構造**:
+- APIエンドポイントは`routers/`ディレクトリ内の各ファイルに機能別に分離されています
+- 新しいエンドポイントを追加する場合は、適切なルーターファイルに追加するか、新しいルーターファイルを作成して`main.py`でインクルードしてください
+
 ### フロントエンドの開発
 
 ```bash
@@ -306,6 +388,17 @@ npm run dev
 ```
 
 フロントエンドは `http://localhost:3000` で起動します。
+
+**コード構造**:
+- **コンポーネント**: `app/components/` - UIコンポーネントを機能別に分離
+- **カスタムフック**: `app/hooks/` - ビジネスロジックと状態管理を分離
+- **ユーティリティ**: `app/utils/` - 共通処理とAPIクライアント
+- **型定義**: `app/types/` - TypeScript型定義
+
+新しい機能を追加する場合:
+1. UIコンポーネントは`components/`に追加
+2. 状態管理やAPI呼び出しは`hooks/`にカスタムフックとして追加
+3. 共通処理は`utils/`に追加
 
 ### データベースマイグレーション
 
