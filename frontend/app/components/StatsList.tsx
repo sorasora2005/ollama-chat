@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, MessageSquare, ThumbsUp, ThumbsDown, TrendingUp, Loader2 } from 'lucide-react'
+import { BarChart3, MessageSquare, ThumbsUp, ThumbsDown, TrendingUp, Loader2, Search } from 'lucide-react'
 import { api } from '../utils/api'
 
 interface FeedbackStats {
@@ -23,19 +23,19 @@ interface StatsListProps {
 export default function StatsList({ userId, username }: StatsListProps) {
   const [stats, setStats] = useState<FeedbackStats[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     if (userId) {
       loadStats()
     }
-  }, [userId, selectedModel])
+  }, [userId])
 
   const loadStats = async () => {
     if (!userId) return
     try {
       setLoading(true)
-      const response = await api.getFeedbackStats(userId, selectedModel || undefined)
+      const response = await api.getFeedbackStats(userId)
       setStats(response.stats)
     } catch (error: any) {
       console.error('Failed to load stats:', error)
@@ -48,7 +48,12 @@ export default function StatsList({ userId, username }: StatsListProps) {
     return new Intl.NumberFormat('ja-JP').format(num)
   }
 
-  const totalStats = stats.reduce((acc, stat) => ({
+  // Filter stats based on search query
+  const filteredStats = stats.filter(stat =>
+    stat.model.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const totalStats = filteredStats.reduce((acc, stat) => ({
     total_messages: acc.total_messages + stat.total_messages,
     total_tokens: acc.total_tokens + stat.total_tokens,
     positive_feedback_count: acc.positive_feedback_count + stat.positive_feedback_count,
@@ -87,6 +92,20 @@ export default function StatsList({ userId, username }: StatsListProps) {
         </div>
       ) : (
         <>
+          {/* Search Input */}
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="モデル名で検索..."
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-lg text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-lg p-6 border border-gray-200 dark:border-gray-800">
@@ -129,19 +148,13 @@ export default function StatsList({ userId, username }: StatsListProps) {
           {/* Model-specific Stats */}
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-black dark:text-white mb-4">モデル別統計</h2>
-            {stats.map((stat) => (
+            {filteredStats.map((stat) => (
               <div
                 key={stat.model}
                 className="bg-gray-50 dark:bg-[#1a1a1a] rounded-lg p-6 border border-gray-200 dark:border-gray-800"
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4">
                   <h3 className="text-lg font-semibold text-black dark:text-white">{stat.model}</h3>
-                  <button
-                    onClick={() => setSelectedModel(selectedModel === stat.model ? null : stat.model)}
-                    className="text-sm text-blue-500 hover:text-blue-600 dark:hover:text-blue-400"
-                  >
-                    {selectedModel === stat.model ? 'すべて表示' : 'フィルター'}
-                  </button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>

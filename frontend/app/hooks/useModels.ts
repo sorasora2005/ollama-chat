@@ -8,6 +8,16 @@ export function useModels() {
   const [downloadingModels, setDownloadingModels] = useState<Set<string>>(new Set())
   const [deletingModels, setDeletingModels] = useState<Set<string>>(new Set())
 
+  // Load default model from localStorage on mount (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const defaultModel = localStorage.getItem('defaultModel')
+      if (defaultModel) {
+        setSelectedModel(defaultModel)
+      }
+    }
+  }, [])
+
   const loadModels = async () => {
     try {
       const availableModels = await api.getModels()
@@ -67,13 +77,28 @@ export function useModels() {
       
       if (allModels.length > 0) {
         setModels(allModels)
+
+        // Priority order:
+        // 1. Current selectedModel if valid and downloaded
+        // 2. Default model from localStorage if valid and downloaded
+        // 3. First downloaded model
+        // 4. First model in list
         const currentModel = allModels.find((m) => m.name === selectedModel)
         if (!currentModel || !currentModel.downloaded) {
-          const downloadedModel = allModels.find((m) => m.downloaded)
-          if (downloadedModel) {
-            setSelectedModel(downloadedModel.name)
-          } else if (allModels.length > 0) {
-            setSelectedModel(allModels[0].name)
+          const storedDefault = localStorage.getItem('defaultModel')
+          const defaultModelObj = storedDefault
+            ? allModels.find((m) => m.name === storedDefault && m.downloaded)
+            : null
+
+          if (defaultModelObj) {
+            setSelectedModel(defaultModelObj.name)
+          } else {
+            const downloadedModel = allModels.find((m) => m.downloaded)
+            if (downloadedModel) {
+              setSelectedModel(downloadedModel.name)
+            } else if (allModels.length > 0) {
+              setSelectedModel(allModels[0].name)
+            }
           }
         }
       }

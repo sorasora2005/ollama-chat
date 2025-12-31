@@ -104,6 +104,13 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
     setMessages([])
     setCurrentSessionId(null)
     setShowSearch(false)
+
+    // Reset to default model if set
+    const defaultModel = localStorage.getItem('defaultModel')
+    if (defaultModel) {
+      setSelectedModel(defaultModel)
+    }
+
     router.replace('/', { scroll: false })
     setTimeout(() => {
       isCreatingNewChatRef.current = false

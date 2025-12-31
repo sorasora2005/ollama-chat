@@ -217,6 +217,16 @@ export function useModelDownload(
     try {
       await api.deleteModel(pendingDeleteModel)
       await loadModels()
+
+      // Clear default model if it was deleted
+      const defaultModel = localStorage.getItem('defaultModel')
+      if (defaultModel === pendingDeleteModel) {
+        localStorage.removeItem('defaultModel')
+        if (showNotification) {
+          showNotification('デフォルトモデルが削除されたため、デフォルト設定をクリアしました', 'info')
+        }
+      }
+
       setPendingDeleteModel(null)
     } catch (error: any) {
       console.error('Failed to delete model:', error)

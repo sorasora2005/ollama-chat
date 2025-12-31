@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, ChevronDown, ChevronRight, X, Loader2, Trash2, Key, Check as CheckIcon, Download, Cpu } from 'lucide-react'
+import { Search, ChevronDown, ChevronRight, X, Loader2, Trash2, Key, Check as CheckIcon, Download, Cpu, Star } from 'lucide-react'
 import { Model } from '../types'
 import { useCloudApiKeys } from '../hooks/useCloudApiKeys'
 import { useModels } from '../hooks/useModels'
 import { useModelDownload } from '../hooks/useModelDownload'
 import { useNotifications } from '../hooks/useNotifications'
 import { useModelManagement } from '../hooks/useModelManagement'
+import { useDefaultModel } from '../hooks/useDefaultModel'
 import DownloadWarningModal from './DownloadWarningModal'
 import DownloadSuccessModal from './DownloadSuccessModal'
 import DeleteConfirmModal from './DeleteConfirmModal'
@@ -33,6 +34,7 @@ export default function ModelList({ userId }: ModelListProps) {
   const { models, loadModels, downloadingModels, setDownloadingModels, deletingModels, setDeletingModels } = useModels()
   const { showNotification } = useNotifications()
   const { filterModels, isCloudModel, groupModelsByFamily, getFamilyDisplayName, getApiProvider } = useModelManagement()
+  const { defaultModel, setDefaultModel, clearDefaultModel } = useDefaultModel()
 
   const {
     showDownloadWarning,
@@ -81,12 +83,33 @@ export default function ModelList({ userId }: ModelListProps) {
   const handleDeleteApiKey = async (provider: 'gemini' | 'gpt' | 'grok' | 'claude') => {
     setUpdatingApiProvider(provider)
     try {
+      // Check if default model uses this provider before deletion
+      const currentDefaultModel = localStorage.getItem('defaultModel')
+      const willClearDefault = currentDefaultModel && currentDefaultModel.toLowerCase().startsWith(provider)
+
       await deleteApiKey(provider)
       showNotification(`${getFamilyDisplayName(provider)}のAPIキーを削除しました`, 'success')
+
+      // Show additional notification if default was cleared
+      if (willClearDefault) {
+        setTimeout(() => {
+          showNotification('デフォルトモデルのAPIキーが削除されたため、デフォルト設定をクリアしました', 'info')
+        }, 1000)
+      }
     } catch (error: any) {
       showNotification(`APIキーの削除に失敗しました: ${error.message || error.response?.data?.detail || '不明なエラー'}`, 'error')
     } finally {
       setUpdatingApiProvider(null)
+    }
+  }
+
+  const handleSetDefault = (modelName: string) => {
+    if (defaultModel === modelName) {
+      clearDefaultModel()
+      showNotification('デフォルトモデルをクリアしました', 'success')
+    } else {
+      setDefaultModel(modelName)
+      showNotification(`${modelName}をデフォルトモデルに設定しました`, 'success')
     }
   }
 
@@ -220,21 +243,39 @@ export default function ModelList({ userId }: ModelListProps) {
                                   {model.description || (model.family && model.type && `${model.family} • ${model.type === 'vision' ? '画像対応' : 'テキスト'}`)}
                                 </div>
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  deleteModel(model.name)
-                                }}
-                                disabled={deletingModels.has(model.name)}
-                                className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-600/20 rounded transition-opacity disabled:opacity-50 ml-2"
-                                title="モデルを削除"
-                              >
-                                {deletingModels.has(model.name) ? (
-                                  <Loader2 className="w-4 h-4 text-red-500 dark:text-red-400 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                )}
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSetDefault(model.name)
+                                  }}
+                                  className={`p-1.5 ${defaultModel === model.name ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} hover:bg-yellow-600/20 rounded transition-opacity`}
+                                  title={defaultModel === model.name ? 'デフォルトを解除' : 'デフォルトに設定'}
+                                >
+                                  <Star
+                                    className={`w-4 h-4 ${
+                                      defaultModel === model.name
+                                        ? 'fill-yellow-500 text-yellow-500'
+                                        : 'text-gray-500 dark:text-gray-400'
+                                    }`}
+                                  />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    deleteModel(model.name)
+                                  }}
+                                  disabled={deletingModels.has(model.name)}
+                                  className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-600/20 rounded transition-opacity disabled:opacity-50"
+                                  title="モデルを削除"
+                                >
+                                  {deletingModels.has(model.name) ? (
+                                    <Loader2 className="w-4 h-4 text-red-500 dark:text-red-400 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -382,9 +423,11 @@ export default function ModelList({ userId }: ModelListProps) {
                       hasApiKey={hasApiKey}
                       getFamilyDisplayName={getFamilyDisplayName}
                       getApiProvider={getApiProvider}
+                      defaultModel={defaultModel}
                       onToggleFamily={() => toggleFamily(family, true)}
                       onOpenApiKeyModal={handleOpenApiKeyModal}
                       onDeleteApiKey={handleDeleteApiKey}
+                      onSetDefault={handleSetDefault}
                     />
                   )
                 })

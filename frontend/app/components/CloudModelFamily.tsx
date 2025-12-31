@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Key, Check as CheckIcon, Loader2, Trash2, Edit } from 'lucide-react'
+import { ChevronDown, ChevronRight, Key, Check as CheckIcon, Loader2, Trash2, Edit, Star } from 'lucide-react'
 import { Model } from '../types'
 
 interface CloudModelItemProps {
@@ -9,9 +9,11 @@ interface CloudModelItemProps {
   userId: number | null
   checkHasApiKey: (provider: 'gemini' | 'gpt' | 'grok' | 'claude') => Promise<boolean>
   getApiProvider: (family: string) => 'gemini' | 'gpt' | 'grok' | 'claude' | null
+  defaultModel: string | null
+  onSetDefault: (modelName: string) => void
 }
 
-function CloudModelItem({ model, userId, checkHasApiKey, getApiProvider }: CloudModelItemProps) {
+function CloudModelItem({ model, userId, checkHasApiKey, getApiProvider, defaultModel, onSetDefault }: CloudModelItemProps) {
   const [modelHasApi, setModelHasApi] = useState(false)
   const [modelLoading, setModelLoading] = useState(true)
   const modelApiProvider = model.family ? getApiProvider(model.family) : null
@@ -38,19 +40,39 @@ function CloudModelItem({ model, userId, checkHasApiKey, getApiProvider }: Cloud
             {model.description || (model.family && model.type && `${model.family} • ${model.type === 'vision' ? '画像対応' : 'テキスト'}`)}
           </div>
         </div>
-        {modelLoading ? (
-          <span className="px-2 py-1 bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded whitespace-nowrap ml-2">
-            確認中...
-          </span>
-        ) : modelHasApi ? (
-          <span className="px-2 py-1 bg-green-600/20 text-green-600 dark:text-green-400 text-xs rounded whitespace-nowrap ml-2">
-            利用可能
-          </span>
-        ) : (
-          <span className="px-2 py-1 bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded whitespace-nowrap ml-2">
-            APIキー未登録
-          </span>
-        )}
+        <div className="flex items-center gap-2 ml-2">
+          {modelLoading ? (
+            <span className="px-2 py-1 bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded whitespace-nowrap">
+              確認中...
+            </span>
+          ) : modelHasApi ? (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSetDefault(model.name)
+                }}
+                className="p-1 hover:bg-yellow-600/20 rounded transition-colors"
+                title={defaultModel === model.name ? 'デフォルトを解除' : 'デフォルトに設定'}
+              >
+                <Star
+                  className={`w-4 h-4 ${
+                    defaultModel === model.name
+                      ? 'fill-yellow-500 text-yellow-500'
+                      : 'text-gray-400 dark:text-gray-500'
+                  }`}
+                />
+              </button>
+              <span className="px-2 py-1 bg-green-600/20 text-green-600 dark:text-green-400 text-xs rounded whitespace-nowrap">
+                利用可能
+              </span>
+            </>
+          ) : (
+            <span className="px-2 py-1 bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded whitespace-nowrap">
+              APIキー未登録
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -66,9 +88,11 @@ interface CloudModelFamilyProps {
   hasApiKey: (provider: 'gemini' | 'gpt' | 'grok' | 'claude') => Promise<boolean>
   getFamilyDisplayName: (family: string) => string
   getApiProvider: (family: string) => 'gemini' | 'gpt' | 'grok' | 'claude' | null
+  defaultModel: string | null
   onToggleFamily: () => void
   onOpenApiKeyModal: (provider: 'gemini' | 'gpt' | 'grok' | 'claude') => void
   onDeleteApiKey: (provider: 'gemini' | 'gpt' | 'grok' | 'claude') => void
+  onSetDefault: (modelName: string) => void
 }
 
 export default function CloudModelFamily({
@@ -81,9 +105,11 @@ export default function CloudModelFamily({
   hasApiKey: checkHasApiKey,
   getFamilyDisplayName,
   getApiProvider,
+  defaultModel,
   onToggleFamily,
   onOpenApiKeyModal,
   onDeleteApiKey,
+  onSetDefault,
 }: CloudModelFamilyProps) {
   const [hasApi, setHasApi] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -203,6 +229,8 @@ export default function CloudModelFamily({
               userId={userId}
               checkHasApiKey={checkHasApiKey}
               getApiProvider={getApiProvider}
+              defaultModel={defaultModel}
+              onSetDefault={onSetDefault}
             />
           ))}
         </div>

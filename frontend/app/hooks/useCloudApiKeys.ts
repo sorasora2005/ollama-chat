@@ -87,11 +87,25 @@ export function useCloudApiKeys(userId: number | null) {
       } catch (error) {
         console.error('Failed to delete API key:', error)
       }
+
+      // Clear default model if it uses this provider
+      const defaultModel = localStorage.getItem('defaultModel')
+      if (defaultModel && defaultModel.toLowerCase().startsWith(provider)) {
+        localStorage.removeItem('defaultModel')
+      }
+
       return
     }
 
     try {
       await api.deleteApiKey(userId, provider)
+
+      // Clear default model if it uses this provider
+      const defaultModel = localStorage.getItem('defaultModel')
+      if (defaultModel && defaultModel.toLowerCase().startsWith(provider)) {
+        localStorage.removeItem('defaultModel')
+      }
+
       // Reload API keys from backend
       await loadApiKeys()
     } catch (error) {
