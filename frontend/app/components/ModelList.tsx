@@ -6,12 +6,14 @@ import { Model } from '../types'
 import { useCloudApiKeys } from '../hooks/useCloudApiKeys'
 import { useModels } from '../hooks/useModels'
 import { useModelDownload } from '../hooks/useModelDownload'
+import { usePersistedDownloads } from '../hooks/usePersistedDownloads'
 import { useNotifications } from '../hooks/useNotifications'
 import { useModelManagement } from '../hooks/useModelManagement'
 import { useDefaultModel } from '../hooks/useDefaultModel'
 import DownloadWarningModal from './DownloadWarningModal'
 import DownloadSuccessModal from './DownloadSuccessModal'
 import DeleteConfirmModal from './DeleteConfirmModal'
+import DownloadProgressIndicator from './DownloadProgressIndicator'
 import CloudModelFamily from './CloudModelFamily'
 import ApiKeyManager from './ApiKeyManager'
 
@@ -36,6 +38,7 @@ export default function ModelList({ userId, loading }: ModelListProps) {
   const { showNotification } = useNotifications()
   const { filterModels, isCloudModel, groupModelsByFamily, getFamilyDisplayName, getApiProvider } = useModelManagement()
   const { defaultModel, setDefaultModel, clearDefaultModel } = useDefaultModel()
+  const persistedDownloads = usePersistedDownloads()
 
   const {
     showDownloadWarning,
@@ -48,6 +51,9 @@ export default function ModelList({ userId, loading }: ModelListProps) {
     downloadModel,
     handleConfirmDownload,
     handleCancelDownload,
+    cancelDownload,
+    pauseDownload,
+    resumeDownload,
     deleteModel,
     handleConfirmDelete,
     handleCancelDelete,
@@ -59,7 +65,8 @@ export default function ModelList({ userId, loading }: ModelListProps) {
     deletingModels,
     setDeletingModels,
     loadModels,
-    showNotification
+    showNotification,
+    persistedDownloads
   )
 
   const handleOpenApiKeyModal = (provider: 'gemini' | 'gpt' | 'grok' | 'claude') => {
@@ -211,6 +218,12 @@ export default function ModelList({ userId, loading }: ModelListProps) {
           </div>
         </div>
       )}
+
+      {/* Download Progress Indicator */}
+      <DownloadProgressIndicator
+        downloads={persistedDownloads.activeDownloads}
+        onStop={pauseDownload}
+      />
 
       {/* Downloaded Models Section */}
       <div className="mb-6 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg p-4 border border-gray-200 dark:border-gray-800">

@@ -10,6 +10,7 @@ import { useModels } from './hooks/useModels'
 import { useChat } from './hooks/useChat'
 import { useFiles } from './hooks/useFiles'
 import { useModelDownload } from './hooks/useModelDownload'
+import { usePersistedDownloads } from './hooks/usePersistedDownloads'
 import { useChatMessage } from './hooks/useChatMessage'
 import { useNotifications } from './hooks/useNotifications'
 import { usePageRouter } from './hooks/usePageRouter'
@@ -134,6 +135,8 @@ export default function Home() {
 
   const { notification, setNotification, showNotification } = useNotifications()
 
+  const persistedDownloads = usePersistedDownloads()
+
   const {
     showDownloadWarning,
     pendingDownloadModel,
@@ -146,6 +149,8 @@ export default function Home() {
     handleConfirmDownload,
     handleCancelDownload,
     cancelDownload,
+    pauseDownload,
+    resumeDownload,
     deleteModel,
     handleConfirmDelete,
     handleCancelDelete,
@@ -157,7 +162,8 @@ export default function Home() {
     deletingModels,
     setDeletingModels,
     loadModels,
-    showNotification
+    showNotification,
+    persistedDownloads
   )
 
   const {
@@ -208,6 +214,23 @@ export default function Home() {
     handleCreateNote,
     handleExportNote,
   } = useNoteManagement(userId, currentSessionId, pathname, username, showNotification)
+
+  // Auto-resume downloads on app load
+  useEffect(() => {
+    if (persistedDownloads.isInitialized && persistedDownloads.activeDownloads.length > 0) {
+      const downloading = persistedDownloads.activeDownloads.filter(d => d.status === 'downloading')
+      if (downloading.length > 0) {
+        showNotification(
+          `${downloading.length}件のダウンロードを再開しています`,
+          'info'
+        )
+        downloading.forEach(async (download) => {
+          await resumeDownload(download.modelName)
+        })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistedDownloads.isInitialized]) // Only run when initialized changes
 
   // Initialize
   useEffect(() => {
@@ -612,6 +635,8 @@ export default function Home() {
           onCreateNote={() => setShowNoteCreateModal(true)}
           onShowNoteSearch={() => setShowNoteSearch(true)}
           pathname={pathname}
+          activeDownloads={persistedDownloads.activeDownloads}
+          onStopDownload={pauseDownload}
         />
 
         {/* Messages Area */}

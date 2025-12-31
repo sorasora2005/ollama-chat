@@ -1,6 +1,7 @@
 import { Menu, Download, ChevronDown, BookOpen, Loader2, X, Search } from 'lucide-react'
 import ModelSelector from './ModelSelector'
-import { Model } from '../types'
+import GlobalDownloadBadge from './GlobalDownloadBadge'
+import { Model, DownloadProgress } from '../types'
 
 interface TopBarProps {
   sidebarOpen: boolean
@@ -23,6 +24,8 @@ interface TopBarProps {
   onCreateNote?: () => void
   onShowNoteSearch?: () => void
   pathname?: string
+  activeDownloads?: DownloadProgress[]
+  onStopDownload?: (modelName: string) => void
 }
 
 export default function TopBar({
@@ -46,108 +49,94 @@ export default function TopBar({
   onCreateNote,
   onShowNoteSearch,
   pathname,
+  activeDownloads,
+  onStopDownload,
 }: TopBarProps) {
   return (
-    <div className="h-14 border-b border-gray-300 dark:border-gray-800 flex items-center justify-between px-4">
-      <div className="flex items-center gap-3">
-        {!sidebarOpen && (
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
-          >
-            <Menu className="w-5 h-5 text-black dark:text-white" />
-          </button>
-        )}
-        <button
-          onClick={onCreateNewChat}
-          className="font-semibold text-black dark:text-white hover:opacity-70 transition-opacity cursor-pointer"
-        >
-          Ollama Chat
-        </button>
-      </div>
-      <div className="flex items-center gap-3 relative model-selector">
-        {/* Downloading Indicators */}
-        {downloadingModels.size > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {Array.from(downloadingModels).map((modelName) => (
-              <div
-                key={modelName}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg"
-              >
-                <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />
-                <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-                  {modelName}をダウンロード中...
-                </span>
-                {onCancelDownload && (
-                  <button
-                    onClick={() => onCancelDownload(modelName)}
-                    className="ml-1 p-0.5 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors"
-                    title="ダウンロードをキャンセル"
-                  >
-                    <X className="w-3 h-3 text-blue-700 dark:text-blue-300" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        {/* Note Search Button - Show on notes page */}
-        {pathname === '/notes' && onShowNoteSearch && (
-          <button
-            onClick={onShowNoteSearch}
-            className="p-2 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
-            title="ノートを検索"
-          >
-            <Search className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-          </button>
-        )}
-        {/* Create Note Button */}
-        {currentSessionId && messagesLength > 0 && onCreateNote && (
-          <button
-            onClick={onCreateNote}
-            className="p-2 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
-            title="ノートを作成"
-          >
-            <BookOpen className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-          </button>
-        )}
-        {/* Export History Button */}
-        {currentSessionId && messagesLength > 0 && (
-          <button
-            onClick={onExportChatHistory}
-            className="p-2 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
-            title="チャット履歴をエクスポート"
-          >
-            <Download className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-          </button>
-        )}
-        {/* Model Selector - Hide on model management, statistics, notes, and files pages */}
-        {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && (
-          <>
+    <>
+      <div className="h-14 border-b border-gray-300 dark:border-gray-800 flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          {!sidebarOpen && (
             <button
-              onClick={() => setShowModelSelector(!showModelSelector)}
-              className="px-3 py-1.5 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors flex items-center gap-2 text-black dark:text-white"
+              onClick={onToggleSidebar}
+              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg"
             >
-              <span>{selectedModel}</span>
-              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showModelSelector ? 'rotate-180' : ''}`} />
+              <Menu className="w-5 h-5 text-black dark:text-white" />
             </button>
-
-            <ModelSelector
-              isOpen={showModelSelector}
-              selectedModel={selectedModel}
-              models={models}
-              modelSearchQuery={modelSearchQuery}
-              downloadingModels={downloadingModels}
-              userId={userId}
-              onModelSearchChange={onModelSearchChange}
-              onModelChange={onModelChange}
-              onDownloadModel={onDownloadModel}
-              onClose={() => setShowModelSelector(false)}
+          )}
+          <button
+            onClick={onCreateNewChat}
+            className="font-semibold text-black dark:text-white hover:opacity-70 transition-opacity cursor-pointer"
+          >
+            Ollama Chat
+          </button>
+        </div>
+        <div className="flex items-center gap-3 relative model-selector">
+          {/* Global Download Badge */}
+          {activeDownloads && activeDownloads.length > 0 && (
+            <GlobalDownloadBadge
+              downloads={activeDownloads}
+              onStop={onStopDownload || (() => { })}
             />
-          </>
-        )}
+          )}
+          {/* Note Search Button - Show on notes page */}
+          {pathname === '/notes' && onShowNoteSearch && (
+            <button
+              onClick={onShowNoteSearch}
+              className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
+              title="ノートを検索"
+            >
+              <Search className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            </button>
+          )}
+          {/* Create Note Button */}
+          {currentSessionId && messagesLength > 0 && onCreateNote && (
+            <button
+              onClick={onCreateNote}
+              className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
+              title="ノートを作成"
+            >
+              <BookOpen className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            </button>
+          )}
+          {/* Export History Button */}
+          {currentSessionId && messagesLength > 0 && (
+            <button
+              onClick={onExportChatHistory}
+              className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
+              title="チャット履歴をエクスポート"
+            >
+              <Download className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            </button>
+          )}
+          {/* Model Selector - Hide on model management, statistics, notes, and files pages */}
+          {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && (
+            <>
+              <button
+                onClick={() => setShowModelSelector(!showModelSelector)}
+                className="px-3 w-36 h-10 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors flex items-center justify-between gap-2 text-black dark:text-white"
+              >
+                <span className="truncate flex-1 text-left">{selectedModel}</span>
+                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-300 ${showModelSelector ? 'rotate-180' : ''}`} />
+              </button>
+
+              <ModelSelector
+                isOpen={showModelSelector}
+                selectedModel={selectedModel}
+                models={models}
+                modelSearchQuery={modelSearchQuery}
+                downloadingModels={downloadingModels}
+                userId={userId}
+                onModelSearchChange={onModelSearchChange}
+                onModelChange={onModelChange}
+                onDownloadModel={onDownloadModel}
+                onClose={() => setShowModelSelector(false)}
+              />
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 

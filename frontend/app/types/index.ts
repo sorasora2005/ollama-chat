@@ -65,3 +65,20 @@ export interface CloudApiKeys {
   claude?: string
 }
 
+export interface DownloadProgress {
+  modelName: string
+  status: 'downloading' | 'paused' | 'stopping'
+  progress: number  // 0-100
+  totalBytes: number
+  completedBytes: number
+  digest?: string
+  startedAt: number
+  lastUpdateAt: number
+  error?: string
+}
+
+export interface PersistedDownloads {
+  version: number
+  downloads: Record<string, DownloadProgress>
+}
+

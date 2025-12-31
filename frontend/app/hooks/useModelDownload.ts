@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { api } from '../utils/api'
 import { estimateModelSizeRange } from '../utils/modelSize'
+import { usePersistedDownloads } from './usePersistedDownloads'
 
 export function useModelDownload(
   downloadingModels: Set<string>,
@@ -8,7 +9,8 @@ export function useModelDownload(
   deletingModels: Set<string>,
   setDeletingModels: React.Dispatch<React.SetStateAction<Set<string>>>,
   loadModels: () => Promise<void>,
-  showNotification?: (message: string, type?: 'success' | 'error' | 'info') => void
+  showNotification?: (message: string, type?: 'success' | 'error' | 'info') => void,
+  persistedDownloads?: ReturnType<typeof usePersistedDownloads>
 ) {
   const [showDownloadWarning, setShowDownloadWarning] = useState(false)
   const [pendingDownloadModel, setPendingDownloadModel] = useState<string | null>(null)
@@ -68,14 +70,20 @@ export function useModelDownload(
   const startDownload = async (modelName: string) => {
     console.log('Starting download for model:', modelName)
     setDownloadingModels(prev => new Set(prev).add(modelName))
-    
+
     // Create AbortController for this download
     const abortController = new AbortController()
     abortControllersRef.current.set(modelName, abortController)
-    
-    // Show notification when download starts
-    if (showNotification) {
-      showNotification(`${modelName}のダウンロードを開始しました`, 'info')
+
+    // Initialize persisted download state
+    if (persistedDownloads) {
+      persistedDownloads.updateDownloadProgress(modelName, {
+        status: 'downloading',
+        progress: 0,
+        totalBytes: 0,
+        completedBytes: 0,
+        startedAt: persistedDownloads.downloads[modelName]?.startedAt || Date.now()
+      })
     }
 
     try {
@@ -129,11 +137,40 @@ export function useModelDownload(
               if (data.error) {
                 console.error('Download error:', data.error)
                 hasError = true
+
+                // Update persisted state with error
+                if (persistedDownloads) {
+                  persistedDownloads.updateDownloadProgress(modelName, {
+                    status: 'downloading',
+                    error: data.error
+                  })
+                }
+
                 throw new Error(data.error)
+              }
+
+              // Track progress if available
+              if (data.total && data.completed !== undefined) {
+                const progress = Math.round((data.completed / data.total) * 100)
+                if (persistedDownloads) {
+                  persistedDownloads.updateDownloadProgress(modelName, {
+                    status: 'downloading',
+                    progress,
+                    totalBytes: data.total,
+                    completedBytes: data.completed,
+                    digest: data.digest
+                  })
+                }
               }
 
               if (data.status === 'success') {
                 console.log('Download completed successfully')
+
+                // Remove from persisted state
+                if (persistedDownloads) {
+                  persistedDownloads.removeDownload(modelName)
+                }
+
                 // Reload models after successful download
                 await loadModels()
                 setCompletedDownloadModel(modelName)
@@ -182,10 +219,15 @@ export function useModelDownload(
         newSet.delete(modelName)
         return newSet
       })
+
+      // Remove from persisted state if still there (cleanup on error/cancel)
+      if (persistedDownloads && persistedDownloads.downloads[modelName]) {
+        persistedDownloads.removeDownload(modelName)
+      }
     }
   }
 
-  const cancelDownload = (modelName: string) => {
+  const cancelDownload = async (modelName: string, deletePartial: boolean = false) => {
     const abortController = abortControllersRef.current.get(modelName)
     if (abortController) {
       abortController.abort()
@@ -195,10 +237,67 @@ export function useModelDownload(
         newSet.delete(modelName)
         return newSet
       })
-      if (showNotification) {
-        showNotification(`${modelName}のダウンロードをキャンセルしました`, 'info')
+
+      // Remove from persisted state
+      if (persistedDownloads) {
+        persistedDownloads.removeDownload(modelName)
+      }
+
+      // If deletePartial is true, try to delete the partial model
+      if (deletePartial) {
+        try {
+          await api.deleteModel(modelName)
+          if (showNotification) {
+            showNotification(`${modelName}の部分ダウンロードを削除しました`, 'success')
+          }
+        } catch (error: any) {
+          // Partial model might not exist yet, that's okay
+          console.log('No partial download to delete (expected if download just started)')
+          if (showNotification) {
+            showNotification(`${modelName}のダウンロードを停止しました`, 'info')
+          }
+        }
+      } else {
+        if (showNotification) {
+          showNotification(`${modelName}のダウンロードをキャンセルしました`, 'info')
+        }
       }
     }
+  }
+
+  const pauseDownload = (modelName: string) => {
+    const abortController = abortControllersRef.current.get(modelName)
+    if (abortController) {
+      // Stop the download and remove from persisted state
+      abortController.abort()
+      abortControllersRef.current.delete(modelName)
+
+      // Remove from persisted downloads
+      if (persistedDownloads) {
+        persistedDownloads.removeDownload(modelName)
+      }
+
+      setDownloadingModels(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(modelName)
+        return newSet
+      })
+
+      if (showNotification) {
+        showNotification(`${modelName}のダウンロードを停止しました`, 'info')
+      }
+    }
+  }
+
+  const resumeDownload = async (modelName: string) => {
+    if (persistedDownloads) {
+      persistedDownloads.updateDownloadProgress(modelName, {
+        status: 'downloading'
+      })
+    }
+
+    // Note: Since Ollama doesn't support true resume, we restart from beginning
+    await startDownload(modelName)
   }
 
   const deleteModel = async (modelName: string) => {
@@ -258,6 +357,8 @@ export function useModelDownload(
     handleConfirmDownload,
     handleCancelDownload,
     cancelDownload,
+    pauseDownload,
+    resumeDownload,
     deleteModel,
     handleConfirmDelete,
     handleCancelDelete,

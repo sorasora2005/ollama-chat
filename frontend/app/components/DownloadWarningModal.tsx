@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { AlertTriangle, Download } from 'lucide-react'
 
 interface DownloadWarningModalProps {
@@ -17,6 +18,23 @@ export default function DownloadWarningModal({
   onConfirm,
   onCancel,
 }: DownloadWarningModalProps) {
+  // Handle Enter key for confirmation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && isOpen) {
+        onConfirm()
+      }
+    }
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onConfirm])
+
   if (!isOpen || !modelName) return null
 
   return (
