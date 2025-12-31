@@ -185,7 +185,7 @@ export default function CloudModelFamily({
                 }}
                 className="px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="APIキーを登録"
-                disabled={['claude', 'gpt', 'grok'].includes(apiProvider || '')}
+                disabled={['claude', 'grok'].includes(apiProvider || '')}
               >
                 <Key className="w-3 h-3" />
                 <span>登録</span>

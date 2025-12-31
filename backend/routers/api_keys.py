@@ -20,10 +20,36 @@ async def test_gemini_api_key(api_key: str) -> tuple[bool, str]:
             response = await client.get(
                 f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
             )
-            
+
             if response.status_code == 200:
                 return True, "APIキーが正常に検証されました"
             elif response.status_code == 400:
+                return False, "無効なAPIキーです"
+            elif response.status_code == 403:
+                return False, "APIキーが無効または権限がありません"
+            else:
+                return False, f"APIキーの検証に失敗しました: {response.status_code}"
+    except httpx.TimeoutException:
+        return False, "APIキーの検証がタイムアウトしました"
+    except Exception as e:
+        return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
+
+async def test_gpt_api_key(api_key: str) -> tuple[bool, str]:
+    """Test OpenAI GPT API key by making a simple request"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Use OpenAI API to list models as a test
+            response = await client.get(
+                "https://api.openai.com/v1/models",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+            )
+
+            if response.status_code == 200:
+                return True, "APIキーが正常に検証されました"
+            elif response.status_code == 401:
                 return False, "無効なAPIキーです"
             elif response.status_code == 403:
                 return False, "APIキーが無効または権限がありません"
@@ -39,6 +65,12 @@ async def test_api_key(request: CloudApiKeyTestRequest):
     """Test if an API key is valid"""
     if request.provider == "gemini":
         is_valid, message = await test_gemini_api_key(request.api_key)
+        return {
+            "valid": is_valid,
+            "message": message
+        }
+    elif request.provider == "gpt":
+        is_valid, message = await test_gpt_api_key(request.api_key)
         return {
             "valid": is_valid,
             "message": message
@@ -65,6 +97,10 @@ async def create_api_key(
     # Test API key before saving
     if request.provider == "gemini":
         is_valid, message = await test_gemini_api_key(request.api_key)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=message)
+    elif request.provider == "gpt":
+        is_valid, message = await test_gpt_api_key(request.api_key)
         if not is_valid:
             raise HTTPException(status_code=400, detail=message)
     

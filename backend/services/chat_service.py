@@ -11,7 +11,7 @@ from models import User, CloudApiKey
 from schemas import ChatRequest
 from .model_detector import ModelDetector
 from .message_repository import MessageRepository
-from .cloud_providers import GeminiProvider
+from .cloud_providers import GeminiProvider, GPTProvider
 
 
 class ChatService:
@@ -36,6 +36,9 @@ class ChatService:
 
         if is_cloud and provider == "gemini":
             async for event in self._handle_gemini(request):
+                yield event
+        elif is_cloud and provider == "gpt":
+            async for event in self._handle_gpt(request):
                 yield event
         else:
             async for event in self._handle_ollama(request):
@@ -63,6 +66,31 @@ class ChatService:
 
         # Generate response
         provider = GeminiProvider()
+        response_data = await provider.generate_response(request, self.db, api_key_obj.api_key)
+        yield f"data: {json.dumps(response_data)}\n\n"
+
+    async def _handle_gpt(self, request: ChatRequest) -> AsyncGenerator[str, None]:
+        """
+        Handle OpenAI GPT cloud provider
+
+        Args:
+            request: Chat request
+
+        Yields:
+            Server-sent events for GPT responses
+        """
+        # Check for API key
+        api_key_obj = self.db.query(CloudApiKey).filter(
+            CloudApiKey.user_id == request.user_id,
+            CloudApiKey.provider == "gpt"
+        ).first()
+
+        if not api_key_obj:
+            yield f"data: {json.dumps({'error': 'OpenAI APIキーが登録されていません。モデル管理ページでAPIキーを登録してください。'})}\n\n"
+            return
+
+        # Generate response
+        provider = GPTProvider()
         response_data = await provider.generate_response(request, self.db, api_key_obj.api_key)
         yield f"data: {json.dumps(response_data)}\n\n"
 

@@ -36,13 +36,6 @@ export function useModels() {
         { name: 'gpt-4-turbo', family: 'gpt', type: 'vision', downloaded: false, description: 'OpenAI GPT-4 Turbo' },
         { name: 'gpt-4', family: 'gpt', type: 'vision', downloaded: false, description: 'OpenAI GPT-4' },
         { name: 'gpt-3.5-turbo', family: 'gpt', type: 'text', downloaded: false, description: 'OpenAI GPT-3.5 Turbo' },
-        { name: 'o1-pro', family: 'gpt', type: 'vision', downloaded: false, description: 'OpenAI O1 Pro' },
-        { name: 'o1', family: 'gpt', type: 'vision', downloaded: false, description: 'OpenAI O1' },
-        { name: 'o3', family: 'gpt', type: 'vision', downloaded: false, description: 'OpenAI O3' },
-        { name: 'o3-mini', family: 'gpt', type: 'vision', downloaded: false, description: 'OpenAI O3 Mini' },
-        { name: 'o4-mini', family: 'gpt', type: 'vision', downloaded: false, description: 'OpenAI O4 Mini' },
-        { name: 'gpt-oss-120b', family: 'gpt', type: 'text', downloaded: false, description: 'OpenAI GPT-OSS 120B (Open)' },
-        { name: 'gpt-oss-20b', family: 'gpt', type: 'text', downloaded: false, description: 'OpenAI GPT-OSS 20B (Open)' },
         // Claude series - Official Anthropic API names
         { name: 'claude-opus-4.5', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude Opus 4.5 (Nov 2025)' },
         { name: 'claude-sonnet-4.5', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude Sonnet 4.5' },
