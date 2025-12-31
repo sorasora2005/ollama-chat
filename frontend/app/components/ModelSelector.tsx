@@ -172,7 +172,7 @@ export default function ModelSelector({
       </div>
 
       {/* Models List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
         {/* Downloaded Models Section */}
         <div className="p-2 border-b border-gray-300 dark:border-gray-800">
           <button
@@ -200,7 +200,7 @@ export default function ModelSelector({
                   const expanded = expandedFamilies.has(family) || !!modelSearchQuery?.trim()
 
                   return (
-                    <div key={family} className="mb-2">
+                    <div key={family} className="mb-0.5">
                       <button
                         onClick={() => toggleFamily(family, false)}
                         className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors"
@@ -289,7 +289,7 @@ export default function ModelSelector({
                   const hasApi = apiProvider ? apiKeyStates[apiProvider] === true : false
 
                   return (
-                    <div key={family} className="mb-2">
+                    <div key={family} className="mb-0.5">
                       <div className="flex items-center justify-between px-2 py-1.5">
                         <button
                           onClick={() => toggleFamily(family, true)}
