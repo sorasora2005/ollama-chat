@@ -57,8 +57,8 @@ function CloudModelItem({ model, userId, checkHasApiKey, getApiProvider, default
               >
                 <Star
                   className={`w-4 h-4 ${defaultModel === model.name
-                      ? 'fill-yellow-500 text-yellow-500'
-                      : 'text-gray-400 dark:text-gray-500'
+                    ? 'fill-yellow-500 text-yellow-500'
+                    : 'text-gray-400 dark:text-gray-500'
                     }`}
                 />
               </button>
@@ -210,7 +210,6 @@ export default function CloudModelFamily({
                 }}
                 className="px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="APIキーを登録"
-                disabled={['grok'].includes(apiProvider || '')}
               >
                 <Key className="w-3 h-3" />
                 <span>登録</span>
