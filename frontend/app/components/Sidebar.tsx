@@ -1,7 +1,8 @@
 'use client'
 
-import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen, Cpu } from 'lucide-react'
+import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen, Cpu, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { ChatSession, UserFile } from '../types'
 
 interface SidebarProps {
@@ -36,6 +37,22 @@ export default function Sidebar({
   onSelectFile,
 }: SidebarProps) {
   const router = useRouter()
+  const [chatHistoryExpanded, setChatHistoryExpanded] = useState(() => {
+    // Initialize from localStorage, default to true if not set
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('chatHistoryExpanded')
+      return stored === null ? true : stored === 'true'
+    }
+    return true
+  })
+
+  const toggleChatHistory = () => {
+    const newState = !chatHistoryExpanded
+    setChatHistoryExpanded(newState)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('chatHistoryExpanded', newState.toString())
+    }
+  }
 
   return (
     <>
@@ -129,23 +146,45 @@ export default function Sidebar({
 
           {/* Chats Section */}
           <div className="mb-4">
-            <div className="w-full flex items-center justify-between px-2 py-2">
-              <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400">チャット</h3>
-            </div>
-            <div className="space-y-0.5">
-              {sessions.map((session) => (
-                <button
-                  key={session.session_id}
-                  onClick={() => onLoadChatHistory(session.session_id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-[#2d2d2d] transition-colors text-black dark:text-white ${currentSessionId === session.session_id ? 'bg-gray-200 dark:bg-[#2d2d2d]' : ''
-                    }`}
-                >
-                  <div className="text-sm truncate">{session.title}</div>
-                  <div className="text-xs text-gray-600 dark:text-gray-500 mt-1">
-                    {new Date(session.updated_at).toLocaleDateString('ja-JP')}
-                  </div>
-                </button>
-              ))}
+            <button
+              onClick={toggleChatHistory}
+              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-200 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors text-black dark:text-white"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span className="text-sm flex-1 text-left">チャット</span>
+              {sessions.length > 0 && (
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  {sessions.length}
+                </span>
+              )}
+              {chatHistoryExpanded ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </button>
+            <div
+              className={`grid transition-all duration-300 ease-in-out ${
+                chatHistoryExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="mt-1 space-y-0.5">
+                  {sessions.map((session) => (
+                    <button
+                      key={session.session_id}
+                      onClick={() => onLoadChatHistory(session.session_id)}
+                      className={`w-full text-left px-3 py-2 ml-8 rounded-lg hover:bg-gray-200 dark:hover:bg-[#2d2d2d] transition-colors text-black dark:text-white ${currentSessionId === session.session_id ? 'bg-gray-200 dark:bg-[#2d2d2d]' : ''
+                        }`}
+                    >
+                      <div className="text-sm truncate">{session.title}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-500 mt-1">
+                        {new Date(session.updated_at).toLocaleDateString('ja-JP')}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>

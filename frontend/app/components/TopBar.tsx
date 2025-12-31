@@ -121,26 +121,31 @@ export default function TopBar({
             <Download className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           </button>
         )}
-        <button
-          onClick={() => setShowModelSelector(!showModelSelector)}
-          className="px-3 py-1.5 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors flex items-center gap-2 text-black dark:text-white"
-        >
-          <span>{selectedModel}</span>
-          <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showModelSelector ? 'rotate-180' : ''}`} />
-        </button>
+        {/* Model Selector - Hide on model management, statistics, notes, and files pages */}
+        {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && (
+          <>
+            <button
+              onClick={() => setShowModelSelector(!showModelSelector)}
+              className="px-3 py-1.5 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors flex items-center gap-2 text-black dark:text-white"
+            >
+              <span>{selectedModel}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showModelSelector ? 'rotate-180' : ''}`} />
+            </button>
 
-        <ModelSelector
-          isOpen={showModelSelector}
-          selectedModel={selectedModel}
-          models={models}
-          modelSearchQuery={modelSearchQuery}
-          downloadingModels={downloadingModels}
-          userId={userId}
-          onModelSearchChange={onModelSearchChange}
-          onModelChange={onModelChange}
-          onDownloadModel={onDownloadModel}
-          onClose={() => setShowModelSelector(false)}
-        />
+            <ModelSelector
+              isOpen={showModelSelector}
+              selectedModel={selectedModel}
+              models={models}
+              modelSearchQuery={modelSearchQuery}
+              downloadingModels={downloadingModels}
+              userId={userId}
+              onModelSearchChange={onModelSearchChange}
+              onModelChange={onModelChange}
+              onDownloadModel={onDownloadModel}
+              onClose={() => setShowModelSelector(false)}
+            />
+          </>
+        )}
       </div>
     </div>
   )
