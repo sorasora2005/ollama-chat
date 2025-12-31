@@ -17,9 +17,10 @@ import ApiKeyManager from './ApiKeyManager'
 
 interface ModelListProps {
   userId: number | null
+  loading: boolean
 }
 
-export default function ModelList({ userId }: ModelListProps) {
+export default function ModelList({ userId, loading }: ModelListProps) {
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set())
   const [expandedCloudFamilies, setExpandedCloudFamilies] = useState<Set<string>>(new Set())
@@ -182,6 +183,34 @@ export default function ModelList({ userId }: ModelListProps) {
           )}
         </div>
       </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-gray-600 dark:text-gray-400 animate-spin" />
+        </div>
+      ) : (
+        <>
+      {/* Default Model Display */}
+      {defaultModel && (
+        <div className="mb-6 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg p-4 border border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-3 mb-2">
+            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">デフォルトモデル</h3>
+          </div>
+          <div className="ml-7">
+            <div className="text-base font-medium text-black dark:text-white">{defaultModel}</div>
+            <div className="text-xs mt-1 text-gray-600 dark:text-gray-400">
+              {(() => {
+                const model = models.find(m => m.name === defaultModel)
+                if (model) {
+                  return model.description || (model.family && model.type && `${model.family} • ${model.type === 'vision' ? '画像対応' : 'テキスト'}`)
+                }
+                return ''
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Downloaded Models Section */}
       <div className="mb-6 bg-gray-50 dark:bg-[#1a1a1a] rounded-lg p-4 border border-gray-200 dark:border-gray-800">
@@ -475,6 +504,8 @@ export default function ModelList({ userId }: ModelListProps) {
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
       />
+      </>
+      )}
     </div>
   )
 }

@@ -59,7 +59,7 @@ export default function FileList({ files, loading, onFileClick }: FileListProps)
                   </div>
                 )}
                 <div className="p-2 flex-shrink-0">
-                  <div className="text-xs text-gray-600 dark:text-gray-500">
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
                     {file.images.length}枚 • {new Date(file.created_at).toLocaleDateString('ja-JP')}
                   </div>
                 </div>

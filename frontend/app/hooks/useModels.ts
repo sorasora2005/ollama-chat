@@ -7,6 +7,7 @@ export function useModels() {
   const [selectedModel, setSelectedModel] = useState('qwen3-vl:4b')
   const [downloadingModels, setDownloadingModels] = useState<Set<string>>(new Set())
   const [deletingModels, setDeletingModels] = useState<Set<string>>(new Set())
+  const [loadingModels, setLoadingModels] = useState(false)
 
   // Load default model from localStorage on mount (client-side only)
   useEffect(() => {
@@ -19,6 +20,7 @@ export function useModels() {
   }, [])
 
   const loadModels = async () => {
+    setLoadingModels(true)
     try {
       const availableModels = await api.getModels()
       
@@ -104,6 +106,8 @@ export function useModels() {
       }
     } catch (error) {
       console.error('Failed to load models:', error)
+    } finally {
+      setLoadingModels(false)
     }
   }
 
@@ -120,6 +124,7 @@ export function useModels() {
     deletingModels,
     setDeletingModels,
     loadModels,
+    loadingModels,
   }
 }
 

@@ -89,6 +89,7 @@ export default function Home() {
     deletingModels,
     setDeletingModels,
     loadModels,
+    loadingModels,
   } = useModels()
 
   const {
@@ -616,7 +617,7 @@ export default function Home() {
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col min-h-0">
           {pathname === '/models' ? (
-            <ModelList userId={userId} />
+            <ModelList userId={userId} loading={loadingModels} />
           ) : pathname === '/stats' ? (
             <StatsList
               userId={userId}
