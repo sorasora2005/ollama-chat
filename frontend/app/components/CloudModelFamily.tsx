@@ -56,11 +56,10 @@ function CloudModelItem({ model, userId, checkHasApiKey, getApiProvider, default
                 title={defaultModel === model.name ? 'デフォルトを解除' : 'デフォルトに設定'}
               >
                 <Star
-                  className={`w-4 h-4 ${
-                    defaultModel === model.name
+                  className={`w-4 h-4 ${defaultModel === model.name
                       ? 'fill-yellow-500 text-yellow-500'
                       : 'text-gray-400 dark:text-gray-500'
-                  }`}
+                    }`}
                 />
               </button>
               <span className="px-2 py-1 bg-green-600/20 text-green-600 dark:text-green-400 text-xs rounded whitespace-nowrap">
@@ -211,7 +210,7 @@ export default function CloudModelFamily({
                 }}
                 className="px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="APIキーを登録"
-                disabled={['claude', 'grok'].includes(apiProvider || '')}
+                disabled={['grok'].includes(apiProvider || '')}
               >
                 <Key className="w-3 h-3" />
                 <span>登録</span>

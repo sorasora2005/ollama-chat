@@ -23,7 +23,7 @@ export function useModels() {
     setLoadingModels(true)
     try {
       const availableModels = await api.getModels()
-      
+
       // Add cloud models (no download required) - using official API names verified 2025-12-30
       const cloudModels: Model[] = [
         // Gemini series - Official Google AI API names
@@ -53,10 +53,6 @@ export function useModels() {
         { name: 'claude-sonnet-4.5', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude Sonnet 4.5' },
         { name: 'claude-haiku-4.5', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude Haiku 4.5 (Oct 2025)' },
         { name: 'claude-opus-4.1', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude Opus 4.1 (Aug 2025)' },
-        { name: 'claude-sonnet-4', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude Sonnet 4 (May 2025)' },
-        { name: 'claude-3-5-sonnet', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude 3.5 Sonnet' },
-        { name: 'claude-3-opus', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude 3 Opus' },
-        { name: 'claude-3-sonnet', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude 3 Sonnet' },
         { name: 'claude-3-haiku', family: 'claude', type: 'vision', downloaded: false, description: 'Anthropic Claude 3 Haiku' },
         // Grok series - Official xAI API names
         { name: 'grok-4-1-fast-reasoning', family: 'grok', type: 'vision', downloaded: false, description: 'xAI Grok 4.1 Fast Reasoning (Nov 2025)' },
@@ -71,12 +67,12 @@ export function useModels() {
         { name: 'grok-2-vision', family: 'grok', type: 'vision', downloaded: false, description: 'xAI Grok 2 Vision' },
         { name: 'grok-2', family: 'grok', type: 'text', downloaded: false, description: 'xAI Grok 2' },
       ]
-      
+
       // Combine available models with cloud models, avoiding duplicates
       const existingModelNames = new Set(availableModels.map(m => m.name))
       const newCloudModels = cloudModels.filter(m => !existingModelNames.has(m.name))
       const allModels = [...availableModels, ...newCloudModels]
-      
+
       if (allModels.length > 0) {
         setModels(allModels)
 
