@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { BarChart3, X } from 'lucide-react'
 
 interface ModelStat {
@@ -21,6 +22,22 @@ export default function ModelStatsModal({
   modelStats,
   onClose,
 }: ModelStatsModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && isOpen) {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   if (!isOpen || !modelStats) return null
 
   return (

@@ -47,11 +47,11 @@ export default function ModelSelector({
   // Load API key states when component mounts, userId changes, or apiKeys change
   useEffect(() => {
     if (!userId) return
-    
+
     const loadApiKeyStates = async () => {
       const providers: Array<'gemini' | 'gpt' | 'grok' | 'claude'> = ['gemini', 'gpt', 'grok', 'claude']
       const states: Record<string, boolean> = {}
-      
+
       for (const provider of providers) {
         try {
           states[provider] = await hasApiKey(provider)
@@ -59,10 +59,10 @@ export default function ModelSelector({
           states[provider] = false
         }
       }
-      
+
       setApiKeyStates(states)
     }
-    
+
     loadApiKeyStates()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, apiKeys, apiKeysLoading])
@@ -147,9 +147,9 @@ export default function ModelSelector({
 
 
   return (
-    <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-800 rounded-lg shadow-xl z-50 max-h-[60vh] flex flex-col">
+    <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-800 rounded-lg shadow-xl z-50 max-h-[60vh] flex flex-col">
       {/* Search Bar */}
-      <div className="p-3 border-b border-gray-300 dark:border-gray-800">
+      <div className="p-2 border-b border-gray-300 dark:border-gray-800">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-600 dark:text-gray-400" />
           <input
@@ -174,7 +174,7 @@ export default function ModelSelector({
       {/* Models List */}
       <div className="flex-1 overflow-y-auto">
         {/* Downloaded Models Section */}
-        <div className="p-3 border-b border-gray-300 dark:border-gray-800">
+        <div className="p-2 border-b border-gray-300 dark:border-gray-800">
           <button
             onClick={() => setExpandedDownloaded(!expandedDownloaded)}
             className="w-full flex items-center gap-2 mb-2 hover:bg-gray-100 dark:hover:bg-[#2d2d2d] rounded-lg px-2 py-1 -mx-2 transition-colors"
@@ -203,7 +203,7 @@ export default function ModelSelector({
                     <div key={family} className="mb-2">
                       <button
                         onClick={() => toggleFamily(family, false)}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors"
+                        className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           {expanded ? (
@@ -225,11 +225,10 @@ export default function ModelSelector({
                             <button
                               key={model.name}
                               onClick={() => onModelChange(model.name)}
-                              className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between mb-1 ${
-                                selectedModel === model.name
-                                  ? 'bg-gray-700 text-white'
-                                  : 'hover:bg-gray-100 dark:hover:bg-[#2d2d2d] text-black dark:text-gray-300'
-                              }`}
+                              className={`w-full text-left px-2 py-1.5 rounded-lg transition-colors flex items-center justify-between mb-1 ${selectedModel === model.name
+                                ? 'bg-gray-700 text-white'
+                                : 'hover:bg-gray-100 dark:hover:bg-[#2d2d2d] text-black dark:text-gray-300'
+                                }`}
                             >
                               <div className="flex-1">
                                 <div className="text-sm font-medium">{model.name}</div>
@@ -253,7 +252,7 @@ export default function ModelSelector({
         </div>
 
         {/* Cloud Models Section */}
-        <div className="p-3">
+        <div className="p-2">
           <button
             onClick={() => setExpandedCloud(!expandedCloud)}
             className="w-full flex items-center justify-between mb-2 hover:bg-gray-100 dark:hover:bg-[#2d2d2d] rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors"
@@ -291,7 +290,7 @@ export default function ModelSelector({
 
                   return (
                     <div key={family} className="mb-2">
-                      <div className="flex items-center justify-between px-3 py-2">
+                      <div className="flex items-center justify-between px-2 py-1.5">
                         <button
                           onClick={() => toggleFamily(family, true)}
                           className="flex-1 flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-[#2d2d2d] rounded-lg px-2 py-1 -mx-2 transition-colors"
@@ -318,11 +317,10 @@ export default function ModelSelector({
                                 handleOpenApiKeyModal(apiProvider)
                               }
                             }}
-                            className={`px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors ${
-                              hasApi
-                                ? 'bg-green-600/20 text-green-600 dark:text-green-400 hover:bg-green-600/30'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                            }`}
+                            className={`px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors ${hasApi
+                              ? 'bg-green-600/20 text-green-600 dark:text-green-400 hover:bg-green-600/30'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                              }`}
                             title={hasApi ? 'APIキーを削除' : 'APIキーを登録'}
                           >
                             {hasApi ? (
@@ -359,13 +357,12 @@ export default function ModelSelector({
                                     }
                                   }}
                                   disabled={!modelHasApi && !!modelApiProvider}
-                                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
-                                    selectedModel === model.name
-                                      ? 'bg-gray-700 text-white'
-                                      : modelHasApi
-                                        ? 'hover:bg-gray-100 dark:hover:bg-[#2d2d2d] text-black dark:text-gray-300'
-                                        : 'opacity-70 cursor-not-allowed text-gray-500 dark:text-gray-500'
-                                  }`}
+                                  className={`w-full text-left px-2 py-1.5 rounded-lg transition-colors flex items-center justify-between ${selectedModel === model.name
+                                    ? 'bg-gray-700 text-white'
+                                    : modelHasApi
+                                      ? 'hover:bg-gray-100 dark:hover:bg-[#2d2d2d] text-black dark:text-gray-300'
+                                      : 'opacity-70 cursor-not-allowed text-gray-500 dark:text-gray-500'
+                                    }`}
                                 >
                                   <div className="flex-1">
                                     <div className="text-sm font-medium">{model.name}</div>

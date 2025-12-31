@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { FileText, X } from 'lucide-react'
 
 interface FilePreviewModalProps {
@@ -15,6 +16,22 @@ export default function FilePreviewModal({
   images,
   onClose,
 }: FilePreviewModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && isOpen) {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { X, ExternalLink, Download } from 'lucide-react'
 import { Note } from '../types'
 
@@ -18,6 +19,22 @@ export default function NoteDetailModal({
   onChatClick,
   onExport,
 }: NoteDetailModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && isOpen) {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   if (!isOpen || !note) return null
 
   return (

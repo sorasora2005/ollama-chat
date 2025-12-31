@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 
 interface DownloadSuccessModalProps {
@@ -13,6 +14,22 @@ export default function DownloadSuccessModal({
   modelName,
   onClose,
 }: DownloadSuccessModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && isOpen) {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   if (!isOpen || !modelName) return null
 
   return (
