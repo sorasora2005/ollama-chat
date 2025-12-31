@@ -37,8 +37,22 @@ async def get_models():
     # Add downloaded models first
     for model in downloaded_models:
         model_name = model.get("name", "")
-        model_type = detect_type(model_name)
+        
+        # Detect model type and family
         model_family = detect_family(model_name)
+        
+        # Enhanced vision detection for downloaded models using Ollama metadata
+        details = model.get("details", {})
+        families = details.get("families", []) or []
+        # 'clip', 'siglip', 'mplug_owl' are common vision encoder families
+        vision_families = ["clip", "siglip", "mplug_owl", "vision", "qwen3vl", "qwen2vl", "llava", "moxin", "internvl"]
+        is_vision_from_metadata = any(f.lower() in vision_families for f in families)
+        
+        # Use metadata if it indicates vision, otherwise fallback to name-based detection
+        if is_vision_from_metadata:
+            model_type = "vision"
+        else:
+            model_type = detect_type(model_name)
         all_models.append({
             "name": model_name,
             "size": model.get("size", 0),

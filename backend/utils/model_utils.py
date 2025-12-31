@@ -23,9 +23,24 @@ def detect_family(model_name: str) -> str:
 def detect_type(model_name: str) -> str:
     """Detect model type (vision or text) from name"""
     name_lower = model_name.lower()
-    if "vl" in name_lower or "vision" in name_lower:
+    
+    # List of keywords that indicate vision support
+    vision_keywords = [
+        "vl", "vision", "llava", "moondream", "bakllava", "minicpm-v", 
+        "cogvlm", "paligemma", "ocr", "mplug", "internvl", "molmo",
+        "llama-3.2-11b-vision", "llama-3.2-90b-vision", "pixtral",
+        "xuyu", "vision-llama", "vision-phi", "vision-mistral"
+    ]
+    if any(keyword in name_lower for keyword in vision_keywords):
         return "vision"
-    elif "embedding" in name_lower:
+    
+    # Special case for Gemma 3 (4b, 12b, 27b are multimodal)
+    if "gemma3" in name_lower:
+        multimodal_sizes = ["4b", "12b", "27b"]
+        if any(size in name_lower for size in multimodal_sizes):
+            return "vision"
+            
+    if "embedding" in name_lower:
         return "embedding"
     return "text"
 
@@ -199,8 +214,9 @@ def get_popular_models() -> List[Dict[str, str]]:
         {"name": "reflection:70b", "family": "llama", "type": "text"},
         {"name": "goliath:70b", "family": "llama", "type": "text"},
         # Gemma series
-        {"name": "gemma3:12b", "family": "gemma", "type": "text"},
-        {"name": "gemma3:4b", "family": "gemma", "type": "text"},
+        {"name": "gemma3:27b", "family": "gemma", "type": "vision"},
+        {"name": "gemma3:12b", "family": "gemma", "type": "vision"},
+        {"name": "gemma3:4b", "family": "gemma", "type": "vision"},
         {"name": "gemma3:1b", "family": "gemma", "type": "text"},
         {"name": "gemma3:270m", "family": "gemma", "type": "text"},
         {"name": "gemma3n:e4b", "family": "gemma", "type": "text"},
@@ -214,7 +230,6 @@ def get_popular_models() -> List[Dict[str, str]]:
         {"name": "shieldgemma:9b", "family": "gemma", "type": "text"},
         {"name": "shieldgemma:2b", "family": "gemma", "type": "text"},
         {"name": "functiongemma:270m", "family": "gemma", "type": "text"},
-        {"name": "embeddinggemma:300m", "family": "gemma", "type": "embedding"},
         # Phi series
         {"name": "phi4:14b", "family": "phi", "type": "text"},
         {"name": "phi4-mini:3.8b", "family": "phi", "type": "text"},
@@ -341,6 +356,10 @@ def get_popular_models() -> List[Dict[str, str]]:
         {"name": "minicpm-v:8b", "family": "other", "type": "vision"},
         {"name": "moondream:1.8b", "family": "other", "type": "vision"},
         {"name": "bakllava:7b", "family": "other", "type": "vision"},
+        {"name": "pixtral:12b", "family": "other", "type": "vision"},
+        {"name": "xuyu:latest", "family": "other", "type": "vision"},
+        {"name": "cogvlm:latest", "family": "other", "type": "vision"},
+        {"name": "cogvlm2:latest", "family": "other", "type": "vision"},
         {"name": "yi:9b", "family": "other", "type": "text"},
         {"name": "yi:6b", "family": "other", "type": "text"},
         {"name": "yi-coder:9b", "family": "other", "type": "text"},
@@ -385,9 +404,6 @@ def get_popular_models() -> List[Dict[str, str]]:
         {"name": "qwen2-math:7b", "family": "other", "type": "text"},
         {"name": "qwen2-math:1.5b", "family": "other", "type": "text"},
         {"name": "qwen2-math:72b", "family": "other", "type": "text"},
-        {"name": "qwen3-embedding:8b", "family": "other", "type": "embedding"},
-        {"name": "qwen3-embedding:4b", "family": "other", "type": "embedding"},
-        {"name": "qwen3-embedding:0.6b", "family": "other", "type": "embedding"},
         {"name": "firefunction-v2:70b", "family": "other", "type": "text"},
         {"name": "sailor2:8b", "family": "other", "type": "text"},
         {"name": "sailor2:1b", "family": "other", "type": "text"},
