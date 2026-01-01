@@ -74,36 +74,8 @@ export default function MessageInput({
           </div>
         )}
 
-        <div className="flex gap-2 items-center bg-gray-100 dark:bg-[#2d2d2d] rounded-2xl px-3 py-2.5 border border-gray-300 dark:border-gray-700/50">
-          <label
-            className={`cursor-pointer w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId || !supportsImages
-              ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-[#3d3d3d]'
-              : 'bg-gray-200 dark:bg-[#3d3d3d] hover:bg-gray-300 dark:hover:bg-[#4d4d4d]'
-              }`}
-            title={!supportsImages ? 'このモデルは画像をサポートしていません' : ''}
-          >
-            <Plus className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''} ${supportsImages ? 'text-gray-700 dark:text-white' : 'text-gray-400'}`} />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.png,.jpg,.jpeg,.txt,.xlsx,.docx"
-              onChange={onFileUpload}
-              className="hidden"
-              disabled={uploading || !userId || !supportsImages}
-            />
-          </label>
-          <button
-            onClick={onUrlClick}
-            disabled={uploading || !userId}
-            className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId
-                ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-[#3d3d3d]'
-                : 'bg-gray-200 dark:bg-[#3d3d3d] hover:bg-gray-300 dark:hover:bg-[#4d4d4d]'
-              }`}
-            title="URLからコンテンツを取得"
-          >
-            <Link className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''} text-gray-700 dark:text-white`} />
-          </button>
-          <div className="flex-1 relative">
+        <div className="flex flex-col bg-gray-100 dark:bg-[#2d2d2d] rounded-3xl px-4 py-3 border border-gray-300 dark:border-gray-700/50 transition-colors focus-within:border-gray-400 dark:focus-within:border-gray-600">
+          <div className="w-full relative">
             <textarea
               ref={textareaRef}
               value={input}
@@ -111,22 +83,56 @@ export default function MessageInput({
               onKeyPress={onKeyPress}
               placeholder={uploadedFile ? `${selectedModel}にメッセージを入力して送信...` : `${selectedModel}にメッセージを入力...`}
               rows={1}
-              className="w-full px-2 py-1.5 bg-transparent resize-none focus:outline-none text-black dark:text-white placeholder-gray-500"
-              style={{ minHeight: '32px', maxHeight: '200px' }}
+              className="w-full px-0 py-2 bg-transparent resize-none focus:outline-none text-black dark:text-white placeholder-gray-500 min-h-[40px] max-h-[200px]"
               disabled={loading || !userId}
             />
           </div>
-          <button
-            onClick={loading ? onCancel : onSend}
-            disabled={(!input.trim() && !uploadedFile && !loading) || !userId}
-            className="p-2 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-          >
-            {loading ? (
-              <Square className="w-5 h-5 text-black dark:text-white" />
-            ) : (
-              <Send className="w-5 h-5 text-black dark:text-white" />
-            )}
-          </button>
+          <div className="flex justify-between items-center mt-2">
+            <div className="flex gap-2">
+              <label
+                className={`cursor-pointer w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId || !supportsImages
+                  ? 'opacity-50 cursor-not-allowed text-gray-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] hover:text-gray-700 dark:hover:text-gray-200'
+                  }`}
+                title={!supportsImages ? 'このモデルは画像をサポートしていません' : ''}
+              >
+                <Plus className={`w-5 h-5 ${uploading ? 'animate-pulse' : ''}`} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.txt,.xlsx,.docx"
+                  onChange={onFileUpload}
+                  className="hidden"
+                  disabled={uploading || !userId || !supportsImages}
+                />
+              </label>
+              <button
+                onClick={onUrlClick}
+                disabled={uploading || !userId}
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId
+                  ? 'opacity-50 cursor-not-allowed text-gray-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] hover:text-gray-700 dark:hover:text-gray-200'
+                  }`}
+                title="URLからコンテンツを取得"
+              >
+                <Link className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''}`} />
+              </button>
+            </div>
+            <button
+              onClick={loading ? onCancel : onSend}
+              disabled={(!input.trim() && !uploadedFile && !loading) || !userId}
+              className={`p-2 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 ${(!input.trim() && !uploadedFile && !loading) || !userId
+                  ? 'bg-gray-200 dark:bg-[#3d3d3d] text-gray-400 cursor-not-allowed'
+                  : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-80'
+                }`}
+            >
+              {loading ? (
+                <Square className="w-4 h-4 fill-current" />
+              ) : (
+                <Send className="w-4 h-4 ml-0.5" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
