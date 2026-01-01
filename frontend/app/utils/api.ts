@@ -238,5 +238,16 @@ export const api = {
   deleteApiKey: async (userId: number, provider: string): Promise<void> => {
     await axios.delete(`${API_URL}/api/api-keys/${userId}/${provider}`)
   },
+
+  // URL Scraping
+  scrapeUrl: async (url: string): Promise<{
+    url: string
+    title: string
+    content: string
+    error?: string
+  }> => {
+    const response = await axios.post(`${API_URL}/api/scrape`, { url })
+    return response.data
+  },
 }
 

@@ -38,6 +38,8 @@ import ModelList from './components/ModelList'
 import NoteCreateModal from './components/NoteCreateModal'
 import NoteDetailModal from './components/NoteDetailModal'
 import LabelManagementModal from './components/LabelManagementModal'
+import UrlInputModal from './components/UrlInputModal'
+import UrlPreviewModal from './components/UrlPreviewModal'
 import { api } from './utils/api'
 import { Note } from './types'
 
@@ -60,6 +62,12 @@ export default function Home() {
     conversation_count: number
   }> | null>(null)
   const [showModelStats, setShowModelStats] = useState(false)
+
+  // URL scraping state
+  const [showUrlInput, setShowUrlInput] = useState(false)
+  const [showUrlPreview, setShowUrlPreview] = useState(false)
+  const [scrapingUrl, setScrapingUrl] = useState(false)
+  const [urlData, setUrlData] = useState<{ url: string, title: string, content: string } | null>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -488,6 +496,44 @@ export default function Home() {
     }
   }
 
+  // Handle URL scraping
+  const handleUrlClick = () => {
+    setShowUrlInput(true)
+  }
+
+  const handleUrlSubmit = async (url: string) => {
+    setShowUrlInput(false)
+    setScrapingUrl(true)
+    setShowUrlPreview(true)
+
+    try {
+      const result = await api.scrapeUrl(url)
+      setUrlData(result)
+    } catch (error: any) {
+      showNotification(`URLの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
+      setShowUrlPreview(false)
+    } finally {
+      setScrapingUrl(false)
+    }
+  }
+
+  const handleUrlConfirm = () => {
+    if (urlData) {
+      // Add URL content to input as context
+      const contextText = `[参照URL: ${urlData.url}]\n[タイトル: ${urlData.title}]\n\n${input}\n\n---以下、ページの内容---\n${urlData.content}`
+      setInput(contextText)
+      setShowUrlPreview(false)
+      setUrlData(null)
+      showNotification('URLの内容をコンテキストに追加しました', 'success')
+    }
+  }
+
+  const handleUrlClose = () => {
+    setShowUrlPreview(false)
+    setUrlData(null)
+    setScrapingUrl(false)
+  }
+
   // Handle export chat history
   const handleExportChatHistory = () => {
     try {
@@ -547,6 +593,22 @@ export default function Home() {
           setShowDownloadSuccess(false)
           setCompletedDownloadModel(null)
         }}
+      />
+
+      <UrlInputModal
+        isOpen={showUrlInput}
+        onClose={() => setShowUrlInput(false)}
+        onSubmit={handleUrlSubmit}
+      />
+
+      <UrlPreviewModal
+        isOpen={showUrlPreview}
+        url={urlData?.url || ''}
+        title={urlData?.title || ''}
+        content={urlData?.content || ''}
+        loading={scrapingUrl}
+        onClose={handleUrlClose}
+        onConfirm={handleUrlConfirm}
       />
 
       <ModelStatsModal
@@ -898,6 +960,7 @@ export default function Home() {
             onSend={handleSendWithFile}
             onCancel={handleCancelStreaming}
             onKeyPress={handleKeyPress}
+            onUrlClick={handleUrlClick}
           />
         )}
       </div>

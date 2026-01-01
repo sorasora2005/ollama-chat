@@ -18,6 +18,8 @@ def detect_family(model_name: str) -> str:
         return "deepseek"
     elif "gamma" in name_lower:
         return "gamma"
+    elif "gemini" in name_lower:
+        return "gemini"
     return "other"
 
 def detect_type(model_name: str) -> str:
@@ -292,8 +294,8 @@ def get_popular_models() -> List[Dict[str, str]]:
         {"name": "olmo-3.1:32b", "family": "other", "type": "text"},
         {"name": "olmo2:7b", "family": "other", "type": "text"},
         {"name": "olmo2:13b", "family": "other", "type": "text"},
-        {"name": "gemini-3-flash-preview", "family": "other", "type": "vision"},
-        {"name": "gemini-3-pro-preview", "family": "other", "type": "vision"},
+        {"name": "gemini-3-flash-preview", "family": "gemini", "type": "vision"},
+        {"name": "gemini-3-pro-preview", "family": "gemini", "type": "vision"},
         {"name": "devstral-small-2:24b", "family": "other", "type": "text"},
         {"name": "devstral:24b", "family": "other", "type": "text"},
         {"name": "gpt-oss:20b", "family": "other", "type": "text"},

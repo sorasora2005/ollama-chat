@@ -27,8 +27,8 @@ export function useModels() {
       // Add cloud models (no download required) - using official API names verified 2025-12-30
       const cloudModels: Model[] = [
         // Gemini series - Official Google AI API names
-        { name: 'gemini-3-pro', family: 'gemini', type: 'vision', downloaded: false, description: 'Google Gemini 3 Pro (Nov 2025)' },
-        { name: 'gemini-3-flash', family: 'gemini', type: 'vision', downloaded: false, description: 'Google Gemini 3 Flash (Dec 2025)' },
+        { name: 'gemini-3-pro-preview', family: 'gemini', type: 'vision', downloaded: false, description: 'Google Gemini 3 Pro (Nov 2025)' },
+        { name: 'gemini-3-flash-preview', family: 'gemini', type: 'vision', downloaded: false, description: 'Google Gemini 3 Flash (Dec 2025)' },
         { name: 'gemini-2.5-pro', family: 'gemini', type: 'vision', downloaded: false, description: 'Google Gemini 2.5 Pro' },
         { name: 'gemini-2.5-flash', family: 'gemini', type: 'vision', downloaded: false, description: 'Google Gemini 2.5 Flash' },
         { name: 'gemini-2.5-flash-lite', family: 'gemini', type: 'vision', downloaded: false, description: 'Google Gemini 2.5 Flash Lite' },

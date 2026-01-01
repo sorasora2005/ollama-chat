@@ -3,6 +3,7 @@ import httpx
 import json
 import uuid
 from typing import Optional
+from google import genai
 from sqlalchemy.orm import Session
 
 from .base import CloudProviderBase
@@ -91,70 +92,48 @@ class GeminiProvider(CloudProviderBase):
 
             # Prepare Gemini request
             gemini_model = self.get_model_name(request.model)
-            gemini_request = {
-                "contents": contents,
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "topK": 40,
-                    "topP": 0.95,
-                    "maxOutputTokens": 8192,
-                },
-            }
-
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
+            
+            # Initialize client
+            client = genai.Client(api_key=api_key)
 
             # Call Gemini API
-            async with httpx.AsyncClient(timeout=300.0) as client:
-                response = await client.post(url, json=gemini_request)
+            response = await client.aio.models.generate_content(
+                model=gemini_model,
+                contents=contents,
+            )
 
-                if response.status_code != 200:
-                    error_text = response.text
-                    try:
-                        error_json = response.json()
-                        error_message = error_json.get("error", {}).get("message", str(error_json))
-                    except json.JSONDecodeError:
-                        error_message = error_text
+            # Check for empty response or candidates
+            if not response.candidates:
+                 # In new SDK, prompt_feedback usually on response or similar
+                 # But usually text is None if blocked.
+                 # Let's rely on candidates check.
+                 repo.delete_message(user_message.id)
+                 return {"error": "Gemini API returned no content (possibly blocked)."}
 
-                    # Rollback user message
-                    repo.delete_message(user_message.id)
-                    return {"error": f"Gemini API error: {error_message}"}
+            # Get text from the first candidate
+            full_message = response.text
+             
+            # Extract token counts
+            usage = response.usage_metadata
+            prompt_tokens = usage.prompt_token_count if usage else 0
+            completion_tokens = usage.candidates_token_count if usage else 0
 
-                response_json = response.json()
+            # Save assistant message
+            assistant_msg = repo.save_assistant_message(
+                user_id=request.user_id,
+                session_id=session_id,
+                content=full_message,
+                model=request.model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens
+            )
 
-                # Check for safety blocks or empty candidates
-                if not response_json.get("candidates"):
-                    finish_reason = response_json.get("promptFeedback", {}).get("blockReason")
-                    if finish_reason:
-                        repo.delete_message(user_message.id)
-                        return {"error": f"Request was blocked by Gemini API due to: {finish_reason}"}
-                    else:
-                        repo.delete_message(user_message.id)
-                        return {"error": "Gemini API returned no content."}
-
-                candidate = response_json["candidates"][0]
-                full_message = "".join(part.get("text", "") for part in candidate.get("content", {}).get("parts", []))
-
-                # Extract token counts
-                usage = response_json.get("usageMetadata", {})
-                prompt_tokens = usage.get("promptTokenCount")
-                completion_tokens = usage.get("candidatesTokenCount")
-
-                # Save assistant message
-                assistant_msg = repo.save_assistant_message(
-                    user_id=request.user_id,
-                    session_id=session_id,
-                    content=full_message,
-                    model=request.model,
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens
-                )
-
-                return {
-                    "content": full_message,
-                    "session_id": session_id,
-                    "message_id": assistant_msg.id,
-                    "done": True,
-                }
+            return {
+                "content": full_message,
+                "session_id": session_id,
+                "message_id": assistant_msg.id,
+                "done": True,
+            }
 
         except httpx.TimeoutException:
             repo.delete_message(user_message.id)

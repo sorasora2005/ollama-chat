@@ -82,3 +82,12 @@ class CloudApiKeyTestRequest(BaseModel):
     provider: str
     api_key: str
 
+class ScrapeUrlRequest(BaseModel):
+    url: str
+
+class ScrapeUrlResponse(BaseModel):
+    url: str
+    title: str
+    content: str
+    error: Optional[str] = None
+

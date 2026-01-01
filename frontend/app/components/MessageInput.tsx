@@ -1,6 +1,6 @@
 'use client'
 
-import { Send, Square, Plus, X, Loader2, FileText } from 'lucide-react'
+import { Send, Square, Plus, X, Loader2, FileText, Link } from 'lucide-react'
 
 interface MessageInputProps {
   input: string
@@ -18,6 +18,7 @@ interface MessageInputProps {
   onSend: () => void
   onCancel: () => void
   onKeyPress: (e: React.KeyboardEvent) => void
+  onUrlClick: () => void
 }
 
 export default function MessageInput({
@@ -36,6 +37,7 @@ export default function MessageInput({
   onSend,
   onCancel,
   onKeyPress,
+  onUrlClick,
 }: MessageInputProps) {
   const getFileIconColor = (filename: string) => {
     const filenameLower = filename.toLowerCase()
@@ -74,11 +76,10 @@ export default function MessageInput({
 
         <div className="flex gap-2 items-center bg-gray-100 dark:bg-[#2d2d2d] rounded-2xl px-3 py-2.5 border border-gray-300 dark:border-gray-700/50">
           <label
-            className={`cursor-pointer w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
-              uploading || !userId || !supportsImages
-                ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-[#3d3d3d]'
-                : 'bg-gray-200 dark:bg-[#3d3d3d] hover:bg-gray-300 dark:hover:bg-[#4d4d4d]'
-            }`}
+            className={`cursor-pointer w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId || !supportsImages
+              ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-[#3d3d3d]'
+              : 'bg-gray-200 dark:bg-[#3d3d3d] hover:bg-gray-300 dark:hover:bg-[#4d4d4d]'
+              }`}
             title={!supportsImages ? 'このモデルは画像をサポートしていません' : ''}
           >
             <Plus className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''} ${supportsImages ? 'text-gray-700 dark:text-white' : 'text-gray-400'}`} />
@@ -91,6 +92,17 @@ export default function MessageInput({
               disabled={uploading || !userId || !supportsImages}
             />
           </label>
+          <button
+            onClick={onUrlClick}
+            disabled={uploading || !userId}
+            className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId
+                ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-[#3d3d3d]'
+                : 'bg-gray-200 dark:bg-[#3d3d3d] hover:bg-gray-300 dark:hover:bg-[#4d4d4d]'
+              }`}
+            title="URLからコンテンツを取得"
+          >
+            <Link className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''} text-gray-700 dark:text-white`} />
+          </button>
           <div className="flex-1 relative">
             <textarea
               ref={textareaRef}
