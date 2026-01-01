@@ -86,13 +86,16 @@ export const exportNote = (
   markdown += `**モデル:** ${note.model}\n`
   markdown += `**ユーザー:** ${username}\n`
   markdown += `**作成日時:** ${toJST(note.created_at)}\n`
+  if (note.labels && note.labels.length > 0) {
+    markdown += `**ラベル:** ${note.labels.join(', ')}\n`
+  }
   markdown += `**エクスポート日時:** ${toJST(new Date().toISOString())}\n\n`
-  
+
   if (note.prompt) {
     markdown += `## プロンプト\n\n`
     markdown += `${note.prompt}\n\n`
   }
-  
+
   markdown += `---\n\n`
   markdown += `## ノート内容\n\n`
   markdown += `${note.content}\n\n`

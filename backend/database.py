@@ -22,6 +22,25 @@ def ensure_columns_exist():
     """Ensure new columns exist in existing databases"""
     inspector = inspect(engine)
     
+    # Check if notes table exists
+    if 'notes' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('notes')]
+        if 'is_deleted' not in columns:
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE notes ADD COLUMN is_deleted INTEGER DEFAULT 0"))
+                    conn.commit()
+            except Exception as e:
+                print(f"Warning: Could not add column is_deleted to notes table: {e}")
+        
+        if 'labels' not in columns:
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE notes ADD COLUMN labels JSONB"))
+                    conn.commit()
+            except Exception as e:
+                print(f"Warning: Could not add column labels to notes table: {e}")
+
     # Check if chat_messages table exists
     if 'chat_messages' in inspector.get_table_names():
         columns = [col['name'] for col in inspector.get_columns('chat_messages')]

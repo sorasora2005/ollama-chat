@@ -79,16 +79,6 @@ export default function TopBar({
               onStop={onStopDownload || (() => { })}
             />
           )}
-          {/* Note Search Button - Show on notes page */}
-          {pathname === '/notes' && onShowNoteSearch && (
-            <button
-              onClick={onShowNoteSearch}
-              className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
-              title="ノートを検索"
-            >
-              <Search className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-            </button>
-          )}
           {/* Create Note Button */}
           {currentSessionId && messagesLength > 0 && onCreateNote && (
             <button

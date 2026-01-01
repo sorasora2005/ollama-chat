@@ -53,6 +53,8 @@ class Note(Base):
     content = Column(Text)  # Note content (generated summary)
     model = Column(String, index=True)  # Model used to generate the note
     prompt = Column(Text)  # User's prompt/instruction for note generation
+    labels = Column(JSON, nullable=True) # Array of labels for the note
+    is_deleted = Column(Integer, default=0) # Flag to indicate if note is in trash (0 = false, 1 = true)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User")

@@ -133,6 +133,7 @@ export const api = {
     session_id: string
     model: string
     prompt: string
+    labels?: string[]
   }): Promise<Note> => {
     const response = await axios.post(`${API_URL}/api/notes`, request)
     return response.data
@@ -153,6 +154,35 @@ export const api = {
       params: { q: query.trim() }
     })
     return response.data.results || []
+  },
+
+  deleteNote: async (noteId: number): Promise<void> => {
+    await axios.delete(`${API_URL}/api/notes/${noteId}`)
+  },
+
+  getTrashNotes: async (userId: number): Promise<Note[]> => {
+    const response = await axios.get(`${API_URL}/api/notes/trash/${userId}`)
+    return response.data.notes || []
+  },
+
+  restoreNote: async (noteId: number): Promise<void> => {
+    await axios.post(`${API_URL}/api/notes/restore/${noteId}`)
+  },
+
+  permanentDeleteNote: async (noteId: number): Promise<void> => {
+    await axios.delete(`${API_URL}/api/notes/permanent/${noteId}`)
+  },
+
+  updateNoteLabels: async (noteId: number, labels: string[]): Promise<void> => {
+    await axios.post(`${API_URL}/api/notes/${noteId}/labels`, { labels })
+  },
+
+  bulkRestoreNotes: async (noteIds: number[]): Promise<void> => {
+    await axios.post(`${API_URL}/api/notes/bulk-restore`, noteIds)
+  },
+
+  bulkPermanentDeleteNotes: async (noteIds: number[]): Promise<void> => {
+    await axios.post(`${API_URL}/api/notes/bulk-permanent`, noteIds)
   },
 
   // Cloud API Keys

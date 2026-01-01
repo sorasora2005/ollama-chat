@@ -45,6 +45,10 @@ class NoteCreateRequest(BaseModel):
     session_id: str
     model: str
     prompt: str
+    labels: Optional[List[str]] = []
+
+class NoteLabelsUpdateRequest(BaseModel):
+    labels: List[str]
 
 class NoteResponse(BaseModel):
     id: int
@@ -54,6 +58,8 @@ class NoteResponse(BaseModel):
     content: str
     model: str
     prompt: str
+    labels: Optional[List[str]] = None
+    is_deleted: Optional[int] = 0
     created_at: str
 
 class CloudApiKeyCreate(BaseModel):

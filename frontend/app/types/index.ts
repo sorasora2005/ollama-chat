@@ -54,6 +54,8 @@ export interface Note {
   content: string
   model: string
   prompt: string
+  labels?: string[]
+  is_deleted?: number
   created_at: string
   snippet?: string  // For search results
 }

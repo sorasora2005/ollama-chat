@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import axios from 'axios'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Trash2, BookOpen, Tag, Search, Pin, Plus, X, RotateCcw, Eraser } from 'lucide-react'
 import { useTheme } from './hooks/useTheme'
 import { useUsers } from './hooks/useUsers'
 import { useModels } from './hooks/useModels'
@@ -37,6 +37,7 @@ import NoteList from './components/NoteList'
 import ModelList from './components/ModelList'
 import NoteCreateModal from './components/NoteCreateModal'
 import NoteDetailModal from './components/NoteDetailModal'
+import LabelManagementModal from './components/LabelManagementModal'
 import { api } from './utils/api'
 import { Note } from './types'
 
@@ -198,7 +199,14 @@ export default function Home() {
   // Note management
   const {
     notes,
+    trashNotes,
+    allLabels,
+    selectedLabel,
+    setSelectedLabel,
     loadingNotes,
+    loadingTrash,
+    showTrash,
+    setShowTrash,
     selectedNote,
     setSelectedNote,
     showNoteCreateModal,
@@ -213,7 +221,35 @@ export default function Home() {
     loadNotes,
     handleCreateNote,
     handleExportNote,
+    handleDeleteNote,
+    handleRestoreNote,
+    handlePermanentDeleteNote,
+    showPermanentDeleteConfirm,
+    pendingDeleteNoteId,
+    handleConfirmPermanentDelete,
+    handleCancelPermanentDelete,
+    handleUpdateNoteLabels,
+    showLabelManagement,
+    setShowLabelManagement,
+    pinnedLabels,
+    handleTogglePinnedLabel,
+    handleBulkRestore,
+    handleBulkPermanentDelete,
+    showEmptyTrashConfirm,
+    setShowEmptyTrashConfirm,
   } = useNoteManagement(userId, currentSessionId, pathname, username, showNotification)
+
+  // Keyboard shortcut for Note Search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k' && pathname === '/notes') {
+        e.preventDefault()
+        noteSearchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [pathname])
 
   // Auto-resume downloads on app load
   useEffect(() => {
@@ -524,9 +560,17 @@ export default function Home() {
 
       <DeleteConfirmModal
         isOpen={showDeleteConfirm}
-        modelName={pendingDeleteModel}
+        title={pendingDeleteModel}
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
+      />
+
+      <DeleteConfirmModal
+        isOpen={showPermanentDeleteConfirm}
+        title={trashNotes.find(n => n.id === pendingDeleteNoteId)?.title || 'ノート'}
+        description="このノートを完全に削除しますか？この操作は取り消せません。"
+        onConfirm={handleConfirmPermanentDelete}
+        onCancel={handleCancelPermanentDelete}
       />
 
       <NoteCreateModal
@@ -544,6 +588,11 @@ export default function Home() {
         onClose={() => setSelectedNote(null)}
         onChatClick={loadChatHistory}
         onExport={handleExportNote}
+        onDelete={handleDeleteNote}
+        onRestore={handleRestoreNote}
+        onPermanentDelete={handlePermanentDeleteNote}
+        onUpdateLabels={handleUpdateNoteLabels}
+        pinnedLabels={pinnedLabels}
       />
 
       <SearchModal
@@ -560,25 +609,25 @@ export default function Home() {
         onLoadChatHistory={loadChatHistory}
       />
 
-      <NoteSearchModal
-        isOpen={showNoteSearch}
-        searchQuery={noteSearchQuery}
-        searchResults={noteSearchResults}
-        searchLoading={noteSearchLoading}
-        searchInputRef={noteSearchInputRef}
-        onSearchQueryChange={setNoteSearchQuery}
-        onClose={() => {
-          setShowNoteSearch(false)
-          setNoteSearchQuery('')
+      <LabelManagementModal
+        isOpen={showLabelManagement}
+        onClose={() => setShowLabelManagement(false)}
+        allLabels={allLabels}
+        pinnedLabels={pinnedLabels}
+        onTogglePin={handleTogglePinnedLabel}
+        onLabelClick={(label) => {
+          setSelectedLabel(label)
+          if (showTrash) setShowTrash(false)
         }}
-        onNoteClick={async (note) => {
-          try {
-            const latestNote = await api.getNoteDetail(note.id)
-            setSelectedNote(latestNote)
-          } catch (error: any) {
-            showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
-          }
-        }}
+      />
+
+      <DeleteConfirmModal
+        isOpen={showEmptyTrashConfirm}
+        title="ゴミ箱を空にする"
+        description={`ゴミ箱内のすべてのノート（${trashNotes.length}件）を完全に削除します。この操作は取り消せません。`}
+        confirmText="完全に削除"
+        onConfirm={handleBulkPermanentDelete}
+        onCancel={() => setShowEmptyTrashConfirm(false)}
       />
 
       <FilePreviewModal
@@ -655,20 +704,159 @@ export default function Home() {
               onFileClick={loadChatHistory}
             />
           ) : pathname === '/notes' ? (
-            <NoteList
-              notes={notes}
-              loading={loadingNotes}
-              onNoteClick={async (note) => {
-                // Fetch latest note detail
-                try {
-                  const latestNote = await api.getNoteDetail(note.id)
-                  setSelectedNote(latestNote)
-                } catch (error: any) {
-                  showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
-                }
-              }}
-              onChatClick={loadChatHistory}
-            />
+            <div className="max-w-4xl mx-auto w-full">
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowTrash(false)}
+                      className={`px-3 py-1.5 rounded-lg text-lg font-bold transition-all flex items-center gap-2 ${!showTrash
+                        ? 'text-black dark:text-white'
+                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                        }`}
+                    >
+                      <BookOpen className={`w-5 h-5 ${!showTrash ? 'text-blue-600 dark:text-blue-400' : ''}`} />
+                      <span>{showTrash ? 'ノート' : 'ノート一覧'}</span>
+                    </button>
+                    {showTrash && (
+                      <span className="text-gray-400 dark:text-gray-600">/</span>
+                    )}
+                    {showTrash && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-lg font-bold text-black dark:text-white">
+                        <Trash2 className="w-5 h-5 text-red-500" />
+                        <span>ゴミ箱</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {showTrash && trashNotes.length > 0 && (
+                      <>
+                        <button
+                          onClick={handleBulkRestore}
+                          className="px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 rounded-lg transition-colors flex items-center gap-1.5"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          すべて復元
+                        </button>
+                        <button
+                          onClick={() => setShowEmptyTrashConfirm(true)}
+                          className="px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-1.5"
+                        >
+                          <Eraser className="w-3.5 h-3.5" />
+                          ゴミ箱を空にする
+                        </button>
+                      </>
+                    )}
+
+                    {!showTrash && (
+                      <button
+                        onClick={() => {
+                          setShowTrash(true)
+                          setSelectedLabel(null)
+                        }}
+                        className="px-3 py-1.5 text-xs text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        ゴミ箱
+                        {trashNotes.length > 0 && (
+                          <span className="ml-0.5 px-1.5 py-0.5 text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full font-bold font-mono">
+                            {trashNotes.length}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {!showTrash && (
+                  <div className="relative group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                    <input
+                      ref={noteSearchInputRef}
+                      type="text"
+                      value={noteSearchQuery}
+                      onChange={(e) => setNoteSearchQuery(e.target.value)}
+                      placeholder="ノートを検索..."
+                      className="w-full pl-11 pr-11 py-3 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-2xl text-sm text-black dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all shadow-sm"
+                    />
+                    {noteSearchQuery && (
+                      <button
+                        onClick={() => setNoteSearchQuery('')}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-400"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Label Filter Chips - Only for active notes */}
+                {!showTrash && (allLabels.length > 0) && (
+                  <div className="relative group">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                      <button
+                        onClick={() => setSelectedLabel(null)}
+                        className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-all border ${selectedLabel === null
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                          : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700'
+                          }`}
+                      >
+                        すべて
+                      </button>
+
+                      {/* Pinned Labels first */}
+                      {pinnedLabels.map((label) => (
+                        <button
+                          key={label}
+                          onClick={() => setSelectedLabel(label === selectedLabel ? null : label)}
+                          className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-all border flex items-center gap-1.5 ${selectedLabel === label
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700'
+                            }`}
+                        >
+                          <Pin className="w-3 h-3 rotate-45" />
+                          {label}
+                        </button>
+                      ))}
+
+                      {/* Manage Labels trigger */}
+                      <button
+                        onClick={() => setShowLabelManagement(true)}
+                        className="px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-all border bg-gray-50 dark:bg-gray-800 border-dashed border-gray-300 dark:border-gray-700 text-gray-500 hover:border-gray-400 dark:hover:border-gray-600 flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3 h-3" />
+                        ラベル管理
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <NoteList
+                notes={noteSearchQuery ? noteSearchResults : (showTrash ? trashNotes : notes)}
+                loading={noteSearchQuery ? noteSearchLoading : (showTrash ? loadingTrash : loadingNotes)}
+                isTrash={showTrash}
+                onNoteClick={async (note) => {
+                  // Fetch latest note detail
+                  try {
+                    const latestNote = await api.getNoteDetail(note.id)
+                    setSelectedNote(latestNote)
+                  } catch (error: any) {
+                    showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
+                  }
+                }}
+                onChatClick={loadChatHistory}
+                onDelete={handleDeleteNote}
+                onRestore={handleRestoreNote}
+                onPermanentDelete={handlePermanentDeleteNote}
+                onLabelClick={(label) => {
+                  setSelectedLabel(label)
+                  if (label && showTrash) setShowTrash(false)
+                }}
+                selectedLabel={selectedLabel}
+                searchQuery={noteSearchQuery}
+              />
+            </div>
           ) : loadingHistory ? (
             <div className="max-w-3xl mx-auto w-full flex flex-col items-center justify-center flex-1">
               <Loader2 className="w-8 h-8 text-gray-600 dark:text-gray-400 animate-spin" />

@@ -8,7 +8,7 @@ import asyncio
 
 from database import get_db, SessionLocal
 from models import User, ChatMessage, Note, CloudApiKey
-from schemas import NoteCreateRequest, NoteResponse
+from schemas import NoteCreateRequest, NoteResponse, NoteLabelsUpdateRequest
 from config import OLLAMA_BASE_URL
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -223,6 +223,7 @@ async def create_note(
         session_id=request.session_id,
         model=request.model,
         prompt=request.prompt,
+        labels=request.labels or [],
         title="生成中...",
         content=""
     )
@@ -248,15 +249,17 @@ async def create_note(
         "content": note.content,
         "model": note.model,
         "prompt": note.prompt,
+        "labels": note.labels or [], "is_deleted": note.is_deleted,
         "created_at": note.created_at.isoformat()
     }
 
 
 @router.get("/{user_id}")
 async def get_notes(user_id: int, db: Session = Depends(get_db)):
-    """Get all notes for a user"""
+    """Get all non-deleted notes for a user"""
     notes = db.query(Note).filter(
-        Note.user_id == user_id
+        Note.user_id == user_id,
+        Note.is_deleted == 0
     ).order_by(Note.created_at.desc()).all()
     
     return {
@@ -269,6 +272,33 @@ async def get_notes(user_id: int, db: Session = Depends(get_db)):
                 "content": note.content,
                 "model": note.model,
                 "prompt": note.prompt,
+                "labels": note.labels or [], "is_deleted": note.is_deleted,
+                "created_at": note.created_at.isoformat()
+            }
+            for note in notes
+        ]
+    }
+
+
+@router.get("/trash/{user_id}")
+async def get_trash_notes(user_id: int, db: Session = Depends(get_db)):
+    """Get all deleted notes for a user"""
+    notes = db.query(Note).filter(
+        Note.user_id == user_id,
+        Note.is_deleted == 1
+    ).order_by(Note.created_at.desc()).all()
+    
+    return {
+        "notes": [
+            {
+                "id": note.id,
+                "user_id": note.user_id,
+                "session_id": note.session_id,
+                "title": note.title,
+                "content": note.content,
+                "model": note.model,
+                "prompt": note.prompt,
+                "labels": note.labels or [], "is_deleted": note.is_deleted,
                 "created_at": note.created_at.isoformat()
             }
             for note in notes
@@ -291,6 +321,7 @@ async def get_note_detail(note_id: int, db: Session = Depends(get_db)):
         "content": note.content,
         "model": note.model,
         "prompt": note.prompt,
+        "labels": note.labels or [], "is_deleted": note.is_deleted,
         "created_at": note.created_at.isoformat()
     }
 
@@ -306,6 +337,7 @@ async def search_notes(user_id: int, q: str, db: Session = Depends(get_db)):
     # Search in note title and content
     matching_notes = db.query(Note).filter(
         Note.user_id == user_id,
+        Note.is_deleted == 0,
         (Note.title.ilike(search_query) | Note.content.ilike(search_query))
     ).order_by(Note.created_at.desc()).all()
     
@@ -342,8 +374,81 @@ async def search_notes(user_id: int, q: str, db: Session = Depends(get_db)):
             "content": note.content,
             "model": note.model,
             "prompt": note.prompt,
+            "labels": note.labels or [],
+            "labels": note.labels or [], "is_deleted": note.is_deleted,
             "created_at": note.created_at.isoformat()
         })
     
     return {"results": results}
 
+
+@router.delete("/{note_id}")
+async def delete_note(note_id: int, db: Session = Depends(get_db)):
+    """Soft-delete a specific note by ID (move to trash)"""
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    note.is_deleted = 1
+    db.commit()
+    
+    return {"status": "success", "message": "Note moved to trash successfully"}
+
+
+@router.post("/restore/{note_id}")
+async def restore_note(note_id: int, db: Session = Depends(get_db)):
+    """Restore a soft-deleted note"""
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    note.is_deleted = 0
+    db.commit()
+    
+    return {"status": "success", "message": "Note restored successfully"}
+
+
+@router.delete("/permanent/{note_id}")
+async def permanent_delete_note(note_id: int, db: Session = Depends(get_db)):
+    """Permanently delete a note from the database"""
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    db.delete(note)
+    db.commit()
+    
+    return {"status": "success", "message": "Note permanently deleted successfully"}
+
+
+@router.post("/{note_id}/labels")
+async def update_note_labels(
+    note_id: int,
+    request: NoteLabelsUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """Update labels for a note"""
+    note = db.query(Note).filter(Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    note.labels = request.labels
+    db.commit()
+    
+    return {"status": "success", "message": "Labels updated successfully"}
+
+@router.post("/bulk-restore")
+async def bulk_restore_notes(note_ids: List[int], db: Session = Depends(get_db)):
+    """Bulk restore notes from trash"""
+    db.query(Note).filter(Note.id.in_(note_ids)).update({Note.is_deleted: 0}, synchronize_session=False)
+    db.commit()
+    return {"status": "success", "message": f"{len(note_ids)} notes restored"}
+
+
+
+@router.post("/bulk-permanent")
+async def bulk_permanent_delete_notes(note_ids: List[int], db: Session = Depends(get_db)):
+    """Bulk permanently delete notes"""
+    db.query(Note).filter(Note.id.in_(note_ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"status": "success", "message": f"{len(note_ids)} notes permanently deleted"}
