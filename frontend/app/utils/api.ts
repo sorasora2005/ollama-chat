@@ -249,5 +249,27 @@ export const api = {
     const response = await axios.post(`${API_URL}/api/scrape`, { url })
     return response.data
   },
+
+  // News
+  getNews: async (userId: number, category: string = 'general', page?: string | null): Promise<{
+    status: string
+    totalResults: number
+    nextPage?: string | null
+    articles: Array<{
+      source: { id: string | null; name: string }
+      author: string | null
+      title: string
+      description: string | null
+      url: string
+      urlToImage: string | null
+      publishedAt: string
+      content: string | null
+    }>
+  }> => {
+    const response = await axios.get(`${API_URL}/api/news`, {
+      params: { user_id: userId, category, page }
+    })
+    return response.data
+  },
 }
 

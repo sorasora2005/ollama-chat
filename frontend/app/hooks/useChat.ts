@@ -7,7 +7,7 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  
+
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -17,7 +17,7 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
   const [searchResults, setSearchResults] = useState<ChatSession[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesStartRef = useRef<HTMLDivElement>(null)
   const lastSentMessageRef = useRef<string | null>(null)
@@ -99,7 +99,7 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
     }
   }
 
-  const createNewChat = () => {
+  const createNewChat = (skipNavigation = false) => {
     isCreatingNewChatRef.current = true
     setMessages([])
     setCurrentSessionId(null)
@@ -111,7 +111,9 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
       setSelectedModel(defaultModel)
     }
 
-    router.replace('/', { scroll: false })
+    if (!skipNavigation) {
+      router.replace('/', { scroll: false })
+    }
     setTimeout(() => {
       isCreatingNewChatRef.current = false
     }, 100)

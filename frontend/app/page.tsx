@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import axios from 'axios'
 import { Loader2, Trash2, BookOpen, Tag, Search, Pin, Plus, X, RotateCcw, Eraser } from 'lucide-react'
 import { useTheme } from './hooks/useTheme'
@@ -31,6 +31,7 @@ import DownloadWarningModal from './components/DownloadWarningModal'
 import DownloadSuccessModal from './components/DownloadSuccessModal'
 import DeleteConfirmModal from './components/DeleteConfirmModal'
 import ModelStatsModal from './components/ModelStatsModal'
+import NewsList from './components/NewsList'
 import FileList from './components/FileList'
 import StatsList from './components/StatsList'
 import NoteList from './components/NoteList'
@@ -46,6 +47,7 @@ import { Note } from './types'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function Home() {
+  const router = useRouter()
   const pathname = usePathname()
   const { isDarkMode, toggleTheme } = useTheme()
   const [isInitialized, setIsInitialized] = useState(false)
@@ -544,6 +546,61 @@ export default function Home() {
     }
   }
 
+  // Scraped cache
+  const scrapedContentCacheRef = useRef<Map<string, { title: string, content: string }>>(new Map())
+
+  // News Chat State
+  const [newsChatArticle, setNewsChatArticle] = useState<any | null>(null)
+
+  // Handle Chat about Article
+  const handleChatAboutArticle = async (article: any) => {
+    // 1. Set the active article to show detailed view
+    setNewsChatArticle(article)
+
+    // 2. Start new chat
+    createNewChat(true)
+    setUploadedFile(null)
+
+    // Check cache
+    const cachedData = scrapedContentCacheRef.current.get(article.url)
+
+    if (cachedData) {
+      // Use cached data
+      const contextText = `[参照URL: ${article.url}]\n[タイトル: ${cachedData.title}]\n\nこの記事について教えてください。\n\n---以下、ページの内容---\n${cachedData.content}`
+      setInput(contextText)
+      // No scraping notification needed if cached
+      return
+    }
+
+    // 3. Inform user that we are scraping
+    showNotification('記事の内容を読み込んでいます... キャンセルせずにそのままお待ちください', 'info')
+
+    try {
+      // 4. Scrape the URL
+      const result = await api.scrapeUrl(article.url)
+
+      // Cache the result
+      scrapedContentCacheRef.current.set(article.url, { title: result.title, content: result.content })
+
+      // 5. Set context with scraped content
+      const contextText = `[参照URL: ${result.url}]\n[タイトル: ${result.title}]\n\nこの記事について教えてください。\n\n---以下、ページの内容---\n${result.content}`
+      setInput(contextText)
+      showNotification('記事の読み込みが完了しました', 'success')
+
+    } catch (error: any) {
+      console.error('Article scraping failed:', error)
+      // Fallback to basic info if scraping fails
+      const contextText = `[参照URL: ${article.url}]\n[タイトル: ${article.title}]\n\nこの記事について教えてください。\n\n---記事の内容---\n${article.description || ''}\n${article.content || ''}`
+      setInput(contextText)
+      showNotification('記事の詳細な読み込みに失敗したため、概要のみを使用します', 'info')
+    }
+  }
+
+  // Handle back to news list
+  const handleBackToNews = () => {
+    setNewsChatArticle(null)
+    // Optional: Reset chat if needed, but keeping history might be better
+  }
 
   // Handle click outside model selector
   useEffect(() => {
@@ -765,6 +822,32 @@ export default function Home() {
               loading={loadingFiles}
               onFileClick={loadChatHistory}
             />
+          ) : pathname === '/news' ? (
+            <NewsList
+              userId={userId || undefined}
+              onChatAboutArticle={handleChatAboutArticle}
+              activeArticle={newsChatArticle}
+              onBackToNews={handleBackToNews}
+            >
+              {newsChatArticle && (
+                <>
+                  <MessageList
+                    messages={messages}
+                    loading={loading}
+                    messageRefs={messageRefs}
+                    messagesEndRef={messagesEndRef}
+                    messagesStartRef={messagesStartRef}
+                    assistantMessageIndex={assistantMessageIndexRef.current}
+                    onCopyMessage={handleCopyMessage}
+                    onRegenerateMessage={regenerateMessage}
+                    onFeedback={handleFeedback}
+                    copiedIndex={copiedIndex}
+                    clickedButton={clickedButton}
+                    userId={userId}
+                  />
+                </>
+              )}
+            </NewsList>
           ) : pathname === '/notes' ? (
             <div className="max-w-4xl mx-auto w-full">
               <div className="mb-6 space-y-4">
@@ -943,7 +1026,7 @@ export default function Home() {
           )}
         </div>
 
-        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && (
+        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && (pathname !== '/news' || newsChatArticle) && (
           <MessageInput
             input={input}
             uploading={uploading}

@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen, Cpu, MessageSquare, ChevronRight } from 'lucide-react'
+import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen, Cpu, MessageSquare, ChevronRight, Newspaper } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ChatSession, UserFile } from '../types'
@@ -118,6 +118,7 @@ export default function Sidebar({
             <span className="text-sm">統計情報</span>
           </button>
 
+
           {/* Notes Link */}
           <button
             onClick={() => router.push('/notes')}
@@ -125,6 +126,15 @@ export default function Sidebar({
           >
             <BookOpen className="w-5 h-5" />
             <span className="text-sm">ノート</span>
+          </button>
+
+          {/* News Link */}
+          <button
+            onClick={() => router.push('/news')}
+            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-200 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors text-black dark:text-white"
+          >
+            <Newspaper className="w-5 h-5" />
+            <span className="text-sm">ニュース</span>
           </button>
 
           {/* Files Link */}

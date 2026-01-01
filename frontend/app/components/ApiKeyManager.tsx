@@ -5,11 +5,11 @@ import { X, Loader2 } from 'lucide-react'
 
 interface ApiKeyManagerProps {
   isOpen: boolean
-  provider: 'gemini' | 'gpt' | 'grok' | 'claude' | null
+  provider: 'gemini' | 'gpt' | 'grok' | 'claude' | 'newsapi' | null
   initialValue?: string
   isUpdating?: boolean
   onClose: () => void
-  onSave: (provider: 'gemini' | 'gpt' | 'grok' | 'claude', apiKey: string) => Promise<void>
+  onSave: (provider: 'gemini' | 'gpt' | 'grok' | 'claude' | 'newsapi', apiKey: string) => Promise<void>
   getFamilyDisplayName: (family: string) => string
 }
 

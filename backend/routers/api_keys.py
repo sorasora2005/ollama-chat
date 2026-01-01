@@ -118,6 +118,33 @@ async def test_grok_api_key(api_key: str) -> tuple[bool, str]:
     except Exception as e:
         return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
 
+async def test_news_api_key(api_key: str) -> tuple[bool, str]:
+    """Test NewsData.io key by making a simple request"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Use NewsData.io latest endpoint as a test
+            response = await client.get(
+                "https://newsdata.io/api/1/latest",
+                params={"country": "jp", "apikey": api_key, "size": 1} # size=1 to minimize usage
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("status") == "success":
+                    return True, "APIキーが正常に検証されました"
+                else:
+                    return False, f"APIキーの検証に失敗しました: {data.get('results', 'Unknown error')}"
+            elif response.status_code == 401:
+                return False, "無効なAPIキーです"
+            elif response.status_code == 403:
+                return False, "アクセス権限がありません（レート制限などの可能性があります）"
+            else:
+                return False, f"APIキーの検証に失敗しました: {response.status_code}"
+    except httpx.TimeoutException:
+        return False, "APIキーの検証がタイムアウトしました"
+    except Exception as e:
+        return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
+
 @router.post("/test")
 async def test_api_key(request: CloudApiKeyTestRequest):
     """Test if an API key is valid"""
@@ -145,6 +172,12 @@ async def test_api_key(request: CloudApiKeyTestRequest):
             "valid": is_valid,
             "message": message
         }
+    elif request.provider == "newsapi":
+        is_valid, message = await test_news_api_key(request.api_key)
+        return {
+            "valid": is_valid,
+            "message": message
+        }
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported provider: {request.provider}")
 
@@ -160,7 +193,7 @@ async def create_api_key(
         raise HTTPException(status_code=404, detail="User not found")
     
     # Validate provider
-    valid_providers = ["gemini", "gpt", "grok", "claude"]
+    valid_providers = ["gemini", "gpt", "grok", "claude", "newsapi"]
     if request.provider not in valid_providers:
         raise HTTPException(status_code=400, detail=f"Invalid provider. Must be one of: {valid_providers}")
     
@@ -179,6 +212,10 @@ async def create_api_key(
             raise HTTPException(status_code=400, detail=message)
     elif request.provider == "grok":
         is_valid, message = await test_grok_api_key(request.api_key)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=message)
+    elif request.provider == "newsapi":
+        is_valid, message = await test_news_api_key(request.api_key)
         if not is_valid:
             raise HTTPException(status_code=400, detail=message)
     
