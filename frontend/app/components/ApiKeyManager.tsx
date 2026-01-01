@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Loader2 } from 'lucide-react'
 
 interface ApiKeyManagerProps {
@@ -27,6 +27,11 @@ export default function ApiKeyManager({
   getFamilyDisplayName,
 }: ApiKeyManagerProps) {
   const [apiKeyInput, setApiKeyInput] = useState(initialValue)
+
+  // Sync input value with initialValue when it changes
+  useEffect(() => {
+    setApiKeyInput(initialValue)
+  }, [initialValue])
 
   if (!isOpen || !provider) return null
 
@@ -63,7 +68,7 @@ export default function ApiKeyManager({
             type="password"
             value={apiKeyInput}
             onChange={(e) => setApiKeyInput(e.target.value)}
-            placeholder={`${getFamilyDisplayName(provider)} APIキーを入力`}
+            placeholder={provider === 'newsapi' ? "newsdata.io APIキーを入力" : `${getFamilyDisplayName(provider)} APIキーを入力`}
             className="w-full px-3 py-2 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-black dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
             autoFocus
             onKeyDown={(e) => {

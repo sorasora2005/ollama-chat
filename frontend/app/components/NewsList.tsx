@@ -43,6 +43,7 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
   const [error, setError] = useState<string | null>(null)
   const [showApiKeyManager, setShowApiKeyManager] = useState(false)
   const [savingApiKey, setSavingApiKey] = useState(false)
+  const [currentApiKey, setCurrentApiKey] = useState<string>('')
 
   // Ref for observer
   const observerTarget = useRef(null)
@@ -55,6 +56,30 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
       fetchNews(true) // Initial fetch
     }
   }, [category, userId])
+
+  // Fetch current API key status when modal opens
+  useEffect(() => {
+    if (showApiKeyManager && userId) {
+      const fetchApiKey = async () => {
+        try {
+          const keyInfo = await api.getApiKey(userId, 'newsapi')
+          if (keyInfo) {
+            // If key exists, show a placeholder to indicate it's set
+            setCurrentApiKey('••••••••••••••••')
+          } else {
+            setCurrentApiKey('')
+          }
+        } catch (err) {
+          // If error or no key found, set empty
+          setCurrentApiKey('')
+        }
+      }
+      fetchApiKey()
+    } else {
+      // Reset when modal closes
+      setCurrentApiKey('')
+    }
+  }, [showApiKeyManager, userId])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -127,7 +152,7 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
   }
 
   const getProviderDisplayName = (p: string) => {
-    if (p === 'newsapi') return 'News API'
+    if (p === 'newsapi') return 'newsdata.io'
     return p
   }
 
@@ -289,7 +314,7 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -301,7 +326,7 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
           onClick={() => setShowApiKeyManager(true)}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors relative group"
         >
-          <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+          <Key className="w-6 h-6 text-gray-600 dark:text-gray-400" />
           <span className="absolute right-0 top-full mt-2 w-max px-2 py-1 text-xs text-white bg-black rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             APIキー設定
           </span>
@@ -324,11 +349,11 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
       </div>
 
       {/* Main Content */}
-      <div className="relative min-h-[50vh]">
+      <div className="relative min-h-[50vh] w-full">
 
 
         {/* Grid List */}
-        <div>
+        <div className="w-full">
           {error ? (
             <div className="text-center py-20 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30">
               <p className="text-red-600 dark:text-red-400 font-medium mb-4">
@@ -425,8 +450,15 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
 
               {/* Skeleton Loaders for initial load or loading more */}
               {loading && (
-                [...Array(3)].map((_, i) => (
-                  <div key={`skeleton-${i}`} className="bg-gray-100 dark:bg-gray-800 h-80 rounded-xl animate-pulse" />
+                [...Array(6)].map((_, i) => (
+                  <div key={`skeleton-${i}`} className="group bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden flex flex-col">
+                    <div className="relative h-48 overflow-hidden bg-gray-200 dark:bg-gray-800 animate-pulse" />
+                    <div className="p-5 flex-1 flex flex-col space-y-3">
+                      <div className="h-6 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
+                      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-3/4" />
+                      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded animate-pulse w-1/2" />
+                    </div>
+                  </div>
                 ))
               )}
             </div>
@@ -458,6 +490,8 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
               isOpen={true} // Always open as it's inside a modal wrapper
               onClose={() => setShowApiKeyManager(false)}
               provider="newsapi"
+              initialValue={currentApiKey}
+              isUpdating={savingApiKey}
               onSave={handleSaveApiKey}
               getFamilyDisplayName={getProviderDisplayName}
             />
