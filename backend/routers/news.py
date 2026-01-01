@@ -34,10 +34,11 @@ async def get_top_headlines(
     user_id: int = Query(..., description="User ID"),
     category: str = "general",
     page: Optional[str] = None,
+    q: Optional[str] = Query(None, description="Search query for news articles"),
     db: Session = Depends(get_db)
 ):
     """
-    Get top headlines from Japan.
+    Get top headlines from Japan. Optionally filter by search query.
     """
     # 1. Try to get API key from user's settings
     api_key_entry = db.query(CloudApiKey).filter(
@@ -72,6 +73,8 @@ async def get_top_headlines(
     }
     if page:
         params["page"] = page
+    if q:
+        params["q"] = q
     
     try:
         response = requests.get(url, params=params)

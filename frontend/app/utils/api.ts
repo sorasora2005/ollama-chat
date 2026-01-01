@@ -251,7 +251,7 @@ export const api = {
   },
 
   // News
-  getNews: async (userId: number, category: string = 'general', page?: string | null): Promise<{
+  getNews: async (userId: number, category: string = 'general', page?: string | null, q?: string | null): Promise<{
     status: string
     totalResults: number
     nextPage?: string | null
@@ -266,9 +266,11 @@ export const api = {
       content: string | null
     }>
   }> => {
-    const response = await axios.get(`${API_URL}/api/news`, {
-      params: { user_id: userId, category, page }
-    })
+    const params: any = { user_id: userId, category }
+    if (page) params.page = page
+    if (q) params.q = q
+
+    const response = await axios.get(`${API_URL}/api/news`, { params })
     return response.data
   },
 }

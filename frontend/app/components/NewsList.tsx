@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../utils/api'
-import { Newspaper, Calendar, ExternalLink, MessageSquare, X, Settings, Key, ArrowLeft } from 'lucide-react'
+import { Newspaper, Calendar, ExternalLink, MessageSquare, X, Settings, Key, ArrowLeft, Search } from 'lucide-react'
 import ApiKeyManager from './ApiKeyManager'
 
 // Constants
@@ -44,18 +44,19 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
   const [showApiKeyManager, setShowApiKeyManager] = useState(false)
   const [savingApiKey, setSavingApiKey] = useState(false)
   const [currentApiKey, setCurrentApiKey] = useState<string>('')
+  const [searchQuery, setSearchQuery] = useState<string>('')
 
   // Ref for observer
   const observerTarget = useRef(null)
 
   useEffect(() => {
     if (userId) {
-      // Reset state on category change
+      // Reset state on category or search query change
       setArticles([])
       setNextPage(null)
       fetchNews(true) // Initial fetch
     }
-  }, [category, userId])
+  }, [category, searchQuery, userId])
 
   // Fetch current API key status when modal opens
   useEffect(() => {
@@ -111,7 +112,8 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
 
     try {
       const pageToFetch = isInitial ? null : nextPage
-      const response = await api.getNews(userId, category, pageToFetch)
+      const query = searchQuery.trim() || null
+      const response = await api.getNews(userId, category, pageToFetch, query)
 
       setArticles(prev => isInitial ? response.articles : [...prev, ...response.articles])
       setNextPage(response.nextPage || null)
@@ -346,6 +348,28 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
             {cat.label}
           </button>
         ))}
+      </div>
+
+      {/* Search Input */}
+      <div className="mb-8">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="キーワードで検索..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-[#252525] text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
