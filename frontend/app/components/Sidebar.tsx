@@ -1,6 +1,6 @@
 'use client'
 
-import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen, Cpu, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react'
+import { Menu, Search, Plus, LogOut, Sun, Moon, FileText, BarChart3, BookOpen, Cpu, MessageSquare, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ChatSession, UserFile } from '../types'
@@ -157,19 +157,15 @@ export default function Sidebar({
                   {sessions.length}
                 </span>
               )}
-              {chatHistoryExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
+              <ChevronRight className={`w-4 h-4 transition-transform duration-300 ${chatHistoryExpanded ? 'rotate-90' : ''}`} />
             </button>
             <div
-              className={`grid transition-all duration-300 ease-in-out ${
-                chatHistoryExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-              }`}
+              className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${chatHistoryExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                }`}
             >
               <div className="overflow-hidden">
-                <div className="mt-1 space-y-0.5">
+                <div className={`mt-1 space-y-0.5 transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${chatHistoryExpanded ? 'translate-y-0' : '-translate-y-4'
+                  }`}>
                   {sessions.map((session) => (
                     <button
                       key={session.session_id}
