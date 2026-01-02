@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Copy, RotateCcw, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { Copy, RotateCcw, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Message } from '../types'
 
 interface ModelResponse {
@@ -18,6 +18,8 @@ interface ComparisonViewProps {
   onCopyMessage: (content: string, modelIndex: number) => void
   onRegenerateForModel: (modelName: string) => void
   copiedIndex: number | null
+  userId: number | null
+  onFeedback?: (messageId: number, feedbackType: 'positive' | 'negative') => void
 }
 
 export default function ComparisonView({
@@ -25,7 +27,11 @@ export default function ComparisonView({
   onCopyMessage,
   onRegenerateForModel,
   copiedIndex,
+  userId,
+  onFeedback,
 }: ComparisonViewProps) {
+  const [feedbackStates, setFeedbackStates] = useState<Map<string, 'positive' | 'negative' | null>>(new Map())
+
   return (
     <div className="flex-1 overflow-hidden">
       <div className={`grid gap-4 h-full p-4 ${
@@ -96,6 +102,66 @@ export default function ComparisonView({
                         >
                           <RotateCcw className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
                         </button>
+                        {userId && message.id && message.streamingComplete && (
+                          <>
+                            <button
+                              onClick={() => {
+                                if (onFeedback && message.id) {
+                                  const messageId = parseInt(message.id)
+                                  if (!isNaN(messageId)) {
+                                    const feedbackType: 'positive' | 'negative' = 'positive'
+                                    onFeedback(messageId, feedbackType)
+                                    setFeedbackStates(prev => {
+                                      const newMap = new Map(prev)
+                                      newMap.set(message.id!, feedbackType)
+                                      return newMap
+                                    })
+                                  }
+                                }
+                              }}
+                              className={`p-1.5 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg transition-colors ${
+                                feedbackStates.get(message.id || '') === 'positive'
+                                  ? 'bg-blue-100 dark:bg-blue-900'
+                                  : ''
+                              }`}
+                              title="良い"
+                            >
+                              <ThumbsUp className={`w-3.5 h-3.5 ${
+                                feedbackStates.get(message.id || '') === 'positive'
+                                  ? 'text-blue-500'
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (onFeedback && message.id) {
+                                  const messageId = parseInt(message.id)
+                                  if (!isNaN(messageId)) {
+                                    const feedbackType: 'positive' | 'negative' = 'negative'
+                                    onFeedback(messageId, feedbackType)
+                                    setFeedbackStates(prev => {
+                                      const newMap = new Map(prev)
+                                      newMap.set(message.id!, feedbackType)
+                                      return newMap
+                                    })
+                                  }
+                                }
+                              }}
+                              className={`p-1.5 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] rounded-lg transition-colors ${
+                                feedbackStates.get(message.id || '') === 'negative'
+                                  ? 'bg-red-100 dark:bg-red-900'
+                                  : ''
+                              }`}
+                              title="悪い"
+                            >
+                              <ThumbsDown className={`w-3.5 h-3.5 ${
+                                feedbackStates.get(message.id || '') === 'negative'
+                                  ? 'text-red-500'
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))

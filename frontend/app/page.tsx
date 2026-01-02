@@ -737,8 +737,7 @@ export default function Home() {
                         ...mr,
                         messages: [{
                           role: 'assistant',
-                          content: accumulatedContent,
-                          timestamp: new Date().toISOString()
+                          content: accumulatedContent
                         }]
                       }
                     : mr
@@ -760,7 +759,8 @@ export default function Home() {
                         ...mr,
                         loading: false,
                         responseTime,
-                        tokens: finalTokens
+                        tokens: finalTokens,
+                        messages: mr.messages.map(m => ({ ...m, id: String(data.message_id), streamingComplete: true }))
                       }
                     : mr
                 ))
@@ -795,7 +795,6 @@ export default function Home() {
     const userMessage: Message = {
       role: 'user',
       content: messageText,
-      timestamp: new Date().toISOString(),
       images: messageImages
     }
 
@@ -1249,6 +1248,8 @@ export default function Home() {
                 onCopyMessage={handleCopyComparisonMessage}
                 onRegenerateForModel={handleRegenerateForModel}
                 copiedIndex={comparisonCopiedIndex}
+                userId={userId}
+                onFeedback={handleFeedback}
               />
             )
           ) : loadingHistory ? (
