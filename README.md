@@ -23,7 +23,9 @@ Ollamaを利用したローカルAIチャットアプリケーション。ロー
 <div align="center">
 
 
-https://github.com/user-attachments/assets/fece7952-e622-4130-ac67-d214fdbc16b3
+
+https://github.com/user-attachments/assets/02effa25-8796-431b-95a1-a41886d8b59c
+
 
 
 </div>
