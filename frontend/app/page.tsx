@@ -626,9 +626,9 @@ export default function Home() {
   // Check if all comparison models support images
   const allComparisonModelsSupportImages = comparisonMode && selectedModelsForComparison.length > 0
     ? selectedModelsForComparison.every(modelName => {
-        const model = models.find(m => m.name === modelName)
-        return model?.type === 'vision'
-      })
+      const model = models.find(m => m.name === modelName)
+      return model?.type === 'vision'
+    })
     : false
 
   // Clear uploaded file when in comparison mode without full vision support
@@ -788,12 +788,12 @@ export default function Home() {
                 setModelResponses(prev => prev.map(mr =>
                   mr.model === modelName
                     ? {
-                        ...mr,
-                        messages: [{
-                          role: 'assistant',
-                          content: accumulatedContent
-                        }]
-                      }
+                      ...mr,
+                      messages: [{
+                        role: 'assistant',
+                        content: accumulatedContent
+                      }]
+                    }
                     : mr
                 ))
               }
@@ -810,12 +810,12 @@ export default function Home() {
                 setModelResponses(prev => prev.map(mr =>
                   mr.model === modelName
                     ? {
-                        ...mr,
-                        loading: false,
-                        responseTime,
-                        tokens: finalTokens,
-                        messages: mr.messages.map(m => ({ ...m, id: String(data.message_id), streamingComplete: true }))
-                      }
+                      ...mr,
+                      loading: false,
+                      responseTime,
+                      tokens: finalTokens,
+                      messages: mr.messages.map(m => ({ ...m, id: String(data.message_id), streamingComplete: true }))
+                    }
                     : mr
                 ))
               }
@@ -1468,22 +1468,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Floating Action Button for Prompt Templates (only in chat view) */}
-        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && pathname !== '/prompts' && pathname !== '/news' && !comparisonMode && (
-          <div className="fixed bottom-24 right-8 z-40">
-            <button
-              onClick={() => setShowPromptApplyModal(true)}
-              className="p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all group"
-              title="プロンプトテンプレートを適用 (Cmd/Ctrl+J)"
-            >
-              <Sparkles className="w-6 h-6" />
-              <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                プロンプトテンプレート
-                <kbd className="ml-2 px-1.5 py-0.5 bg-gray-800 rounded text-[10px]">⌘J</kbd>
-              </span>
-            </button>
-          </div>
-        )}
+
 
         {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && pathname !== '/prompts' && (pathname !== '/news' || newsChatArticle) && !comparisonMode && (
           <MessageInput
@@ -1503,6 +1488,7 @@ export default function Home() {
             onCancel={handleCancelStreaming}
             onKeyPress={handleKeyPress}
             onUrlClick={handleUrlClick}
+            onPromptTemplateClick={() => setShowPromptApplyModal(true)}
           />
         )}
 
@@ -1544,7 +1530,7 @@ export default function Home() {
                 onFileUpload={handleFileUpload}
                 onRemoveFile={() => setUploadedFile(null)}
                 onSend={handleSendComparisonMessage}
-                onCancel={() => {}}
+                onCancel={() => { }}
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -1552,6 +1538,7 @@ export default function Home() {
                   }
                 }}
                 onUrlClick={handleUrlClick}
+                onPromptTemplateClick={() => setShowPromptApplyModal(true)}
               />
             </div>
           </div>

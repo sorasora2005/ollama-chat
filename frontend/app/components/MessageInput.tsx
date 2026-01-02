@@ -1,6 +1,6 @@
 'use client'
 
-import { Send, Square, Plus, X, Loader2, FileText, Link } from 'lucide-react'
+import { Send, Square, Plus, X, Loader2, FileText, Link, Sparkles } from 'lucide-react'
 
 interface MessageInputProps {
   input: string
@@ -19,6 +19,7 @@ interface MessageInputProps {
   onCancel: () => void
   onKeyPress: (e: React.KeyboardEvent) => void
   onUrlClick: () => void
+  onPromptTemplateClick: () => void
 }
 
 export default function MessageInput({
@@ -38,6 +39,7 @@ export default function MessageInput({
   onCancel,
   onKeyPress,
   onUrlClick,
+  onPromptTemplateClick,
 }: MessageInputProps) {
   const getFileIconColor = (filename: string) => {
     const filenameLower = filename.toLowerCase()
@@ -89,6 +91,7 @@ export default function MessageInput({
           </div>
           <div className="flex justify-between items-center mt-2">
             <div className="flex gap-2">
+              {/* 添付アイコン */}
               <label
                 className={`cursor-pointer w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId || !supportsImages
                   ? 'opacity-50 cursor-not-allowed text-gray-400'
@@ -106,6 +109,19 @@ export default function MessageInput({
                   disabled={uploading || !userId || !supportsImages}
                 />
               </label>
+              {/* プロンプトテンプレートアイコン */}
+              <button
+                onClick={onPromptTemplateClick}
+                disabled={uploading || !userId}
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${uploading || !userId
+                  ? 'opacity-50 cursor-not-allowed text-gray-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#3d3d3d] hover:text-gray-700 dark:hover:text-gray-200'
+                  }`}
+                title="プロンプトテンプレートを適用"
+              >
+                <Sparkles className={`w-4 h-4 ${uploading ? 'animate-pulse' : ''}`} />
+              </button>
+              {/* URLアイコン */}
               <button
                 onClick={onUrlClick}
                 disabled={uploading || !userId}
@@ -122,8 +138,8 @@ export default function MessageInput({
               onClick={loading ? onCancel : onSend}
               disabled={(!input.trim() && !uploadedFile && !loading) || !userId}
               className={`p-2 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 ${(!input.trim() && !uploadedFile && !loading) || !userId
-                  ? 'bg-gray-200 dark:bg-[#3d3d3d] text-gray-400 cursor-not-allowed'
-                  : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-80'
+                ? 'bg-gray-200 dark:bg-[#3d3d3d] text-gray-400 cursor-not-allowed'
+                : 'bg-black dark:bg-white text-white dark:text-black hover:opacity-80'
                 }`}
             >
               {loading ? (
