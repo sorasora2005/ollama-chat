@@ -2,184 +2,26 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
-import httpx
-import json
 
 from database import get_db
 from models import User, CloudApiKey
 from schemas import CloudApiKeyCreate, CloudApiKeyResponse, CloudApiKeyTestRequest
+from services.api_key_validator import ApiKeyValidator
 
 router = APIRouter(prefix="/api/api-keys", tags=["api-keys"])
 
-async def test_gemini_api_key(api_key: str) -> tuple[bool, str]:
-    """Test Gemini API key by making a simple request"""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Use Gemini API to test the key
-            # Try to list models or make a simple request
-            response = await client.get(
-                f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-            )
-
-            if response.status_code == 200:
-                return True, "APIキーが正常に検証されました"
-            elif response.status_code == 400:
-                return False, "無効なAPIキーです"
-            elif response.status_code == 403:
-                return False, "APIキーが無効または権限がありません"
-            else:
-                return False, f"APIキーの検証に失敗しました: {response.status_code}"
-    except httpx.TimeoutException:
-        return False, "APIキーの検証がタイムアウトしました"
-    except Exception as e:
-        return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
-
-async def test_gpt_api_key(api_key: str) -> tuple[bool, str]:
-    """Test OpenAI GPT API key by making a simple request"""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Use OpenAI API to list models as a test
-            response = await client.get(
-                "https://api.openai.com/v1/models",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
-            )
-
-            if response.status_code == 200:
-                return True, "APIキーが正常に検証されました"
-            elif response.status_code == 401:
-                return False, "無効なAPIキーです"
-            elif response.status_code == 403:
-                return False, "APIキーが無効または権限がありません"
-            else:
-                return False, f"APIキーの検証に失敗しました: {response.status_code}"
-    except httpx.TimeoutException:
-        return False, "APIキーの検証がタイムアウトしました"
-    except Exception as e:
-        return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
-
-async def test_claude_api_key(api_key: str) -> tuple[bool, str]:
-    """Test Anthropic Claude API key by making a simple request"""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Send a minimal message to test the key
-            response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "claude-3-haiku-20240307",
-                    "max_tokens": 1,
-                    "messages": [{"role": "user", "content": "Hi"}]
-                }
-            )
-
-            if response.status_code == 200:
-                return True, "APIキーが正常に検証されました"
-            elif response.status_code == 401:
-                return False, "無効なAPIキーです"
-            elif response.status_code == 403:
-                return False, "APIキーが無効または権限がありません"
-            else:
-                return False, f"APIキーの検証に失敗しました: {response.status_code}"
-    except httpx.TimeoutException:
-        return False, "APIキーの検証がタイムアウトしました"
-    except Exception as e:
-        return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
-
-async def test_grok_api_key(api_key: str) -> tuple[bool, str]:
-    """Test xAI Grok API key by making a simple request"""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Use xAI API to list models as a test
-            response = await client.get(
-                "https://api.x.ai/v1/models",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
-            )
-
-            if response.status_code == 200:
-                return True, "APIキーが正常に検証されました"
-            elif response.status_code == 401:
-                return False, "無効なAPIキーです"
-            elif response.status_code == 403:
-                return False, "APIキーが無効または権限がありません"
-            else:
-                return False, f"APIキーの検証に失敗しました: {response.status_code}"
-    except httpx.TimeoutException:
-        return False, "APIキーの検証がタイムアウトしました"
-    except Exception as e:
-        return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
-
-async def test_news_api_key(api_key: str) -> tuple[bool, str]:
-    """Test NewsData.io key by making a simple request"""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Use NewsData.io latest endpoint as a test
-            response = await client.get(
-                "https://newsdata.io/api/1/latest",
-                params={"country": "jp", "apikey": api_key, "size": 1} # size=1 to minimize usage
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("status") == "success":
-                    return True, "APIキーが正常に検証されました"
-                else:
-                    return False, f"APIキーの検証に失敗しました: {data.get('results', 'Unknown error')}"
-            elif response.status_code == 401:
-                return False, "無効なAPIキーです"
-            elif response.status_code == 403:
-                return False, "アクセス権限がありません（レート制限などの可能性があります）"
-            else:
-                return False, f"APIキーの検証に失敗しました: {response.status_code}"
-    except httpx.TimeoutException:
-        return False, "APIキーの検証がタイムアウトしました"
-    except Exception as e:
-        return False, f"APIキーの検証中にエラーが発生しました: {str(e)}"
 
 @router.post("/test")
 async def test_api_key(request: CloudApiKeyTestRequest):
     """Test if an API key is valid"""
-    if request.provider == "gemini":
-        is_valid, message = await test_gemini_api_key(request.api_key)
-        return {
-            "valid": is_valid,
-            "message": message
-        }
-    elif request.provider == "gpt":
-        is_valid, message = await test_gpt_api_key(request.api_key)
-        return {
-            "valid": is_valid,
-            "message": message
-        }
-    elif request.provider == "claude":
-        is_valid, message = await test_claude_api_key(request.api_key)
-        return {
-            "valid": is_valid,
-            "message": message
-        }
-    elif request.provider == "grok":
-        is_valid, message = await test_grok_api_key(request.api_key)
-        return {
-            "valid": is_valid,
-            "message": message
-        }
-    elif request.provider == "newsapi":
-        is_valid, message = await test_news_api_key(request.api_key)
-        return {
-            "valid": is_valid,
-            "message": message
-        }
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported provider: {request.provider}")
+    is_valid, message = await ApiKeyValidator.validate_api_key(
+        request.provider,
+        request.api_key
+    )
+    return {
+        "valid": is_valid,
+        "message": message
+    }
 
 @router.post("", response_model=CloudApiKeyResponse)
 async def create_api_key(
@@ -198,26 +40,12 @@ async def create_api_key(
         raise HTTPException(status_code=400, detail=f"Invalid provider. Must be one of: {valid_providers}")
     
     # Test API key before saving
-    if request.provider == "gemini":
-        is_valid, message = await test_gemini_api_key(request.api_key)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=message)
-    elif request.provider == "gpt":
-        is_valid, message = await test_gpt_api_key(request.api_key)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=message)
-    elif request.provider == "claude":
-        is_valid, message = await test_claude_api_key(request.api_key)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=message)
-    elif request.provider == "grok":
-        is_valid, message = await test_grok_api_key(request.api_key)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=message)
-    elif request.provider == "newsapi":
-        is_valid, message = await test_news_api_key(request.api_key)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=message)
+    is_valid, message = await ApiKeyValidator.validate_api_key(
+        request.provider,
+        request.api_key
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=message)
     
     # Check if API key already exists for this user and provider
     existing_key = db.query(CloudApiKey).filter(

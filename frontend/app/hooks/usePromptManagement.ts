@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { PromptTemplate } from '../types'
 import { api } from '../utils/api'
+import { logger } from '../utils/logger'
 
 /**
  * Prompt template management hook
@@ -36,7 +37,7 @@ export function usePromptManagement(
       try {
         setPinnedCategories(JSON.parse(saved))
       } catch (e) {
-        console.error('Failed to parse pinned categories', e)
+        logger.error('Failed to parse pinned categories', e)
       }
     }
   }, [])
@@ -81,7 +82,7 @@ export function usePromptManagement(
       const templatesData = await api.getPromptTemplates(userId)
       setTemplates(templatesData)
     } catch (error: any) {
-      console.error('Failed to load templates:', error)
+      logger.error('Failed to load templates:', error)
       showNotification(`テンプレートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
     } finally {
       setLoadingTemplates(false)
@@ -112,7 +113,7 @@ export function usePromptManagement(
       const results = await api.searchPromptTemplates(userId, query)
       setTemplateSearchResults(results)
     } catch (error) {
-      console.error('Failed to search templates:', error)
+      logger.error('Failed to search templates:', error)
       setTemplateSearchResults([])
     } finally {
       setTemplateSearchLoading(false)

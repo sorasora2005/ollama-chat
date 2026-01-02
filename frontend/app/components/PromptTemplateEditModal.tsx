@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Plus, Tag, Hash } from 'lucide-react'
 import { PromptTemplate } from '../types'
+import { logger } from '../utils/logger'
 
 interface PromptTemplateEditModalProps {
   isOpen: boolean
@@ -91,8 +92,8 @@ export default function PromptTemplateEditModal({
       })
       onClose()
     } catch (error) {
-      console.error('Failed to update template:', error)
-    } finally {
+      logger.error('Failed to update template:', error)
+    } finally{
       setUpdating(false)
     }
   }

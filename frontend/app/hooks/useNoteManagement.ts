@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Note } from '../types'
 import { api } from '../utils/api'
 import { exportNote } from '../utils/chatExport'
+import { logger } from '../utils/logger'
 
 /**
  * Note management hook
@@ -40,7 +41,7 @@ export function useNoteManagement(
       try {
         setPinnedLabels(JSON.parse(saved))
       } catch (e) {
-        console.error('Failed to parse pinned labels', e)
+        logger.error('Failed to parse pinned labels', e)
       }
     }
   }, [])
@@ -85,7 +86,7 @@ export function useNoteManagement(
       const notesData = await api.getNotes(userId)
       setNotes(notesData)
     } catch (error: any) {
-      console.error('Failed to load notes:', error)
+      logger.error('Failed to load notes:', error)
       showNotification(`ノートの取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
     } finally {
       setLoadingNotes(false)
@@ -102,7 +103,7 @@ export function useNoteManagement(
       const notesData = await api.getTrashNotes(userId)
       setTrashNotes(notesData)
     } catch (error: any) {
-      console.error('Failed to load trash notes:', error)
+      logger.error('Failed to load trash notes:', error)
       showNotification(`ゴミ箱の取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
     } finally {
       setLoadingTrash(false)
@@ -133,7 +134,7 @@ export function useNoteManagement(
       const results = await api.searchNotes(userId, query)
       setNoteSearchResults(results)
     } catch (error) {
-      console.error('Failed to search notes:', error)
+      logger.error('Failed to search notes:', error)
       setNoteSearchResults([])
     } finally {
       setNoteSearchLoading(false)

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { api } from '../utils/api'
 import { estimateModelSizeRange } from '../utils/modelSize'
 import { usePersistedDownloads } from './usePersistedDownloads'
+import { logger } from '../utils/logger'
 
 export function useModelDownload(
   downloadingModels: Set<string>,
@@ -68,7 +69,7 @@ export function useModelDownload(
   }
 
   const startDownload = async (modelName: string) => {
-    console.log('Starting download for model:', modelName)
+    logger.debug('Starting download for model:', modelName)
     setDownloadingModels(prev => new Set(prev).add(modelName))
 
     // Create AbortController for this download
@@ -88,11 +89,11 @@ export function useModelDownload(
 
     try {
       const response = await api.pullModel(modelName, abortController.signal)
-      console.log('Download response status:', response.status)
+      logger.debug('Download response status:', response.status)
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('Download failed:', errorText)
+        logger.error('Download failed:', errorText)
         throw new Error(`ダウンロードの開始に失敗しました: ${response.status} ${errorText}`)
       }
 
@@ -108,13 +109,13 @@ export function useModelDownload(
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
-          console.log('Stream ended')
+          logger.debug('Stream ended')
           break
         }
-        
+
         // Check if download was cancelled
         if (abortController.signal.aborted) {
-          console.log('Download cancelled')
+          logger.debug('Download cancelled')
           reader.cancel()
           break
         }
@@ -132,10 +133,10 @@ export function useModelDownload(
               if (!jsonStr) continue
 
               const data = JSON.parse(jsonStr)
-              console.log('Received data:', data)
+              logger.debug('Received data:', data)
 
               if (data.error) {
-                console.error('Download error:', data.error)
+                logger.error('Download error:', data.error)
                 hasError = true
 
                 // Update persisted state with error
@@ -164,7 +165,7 @@ export function useModelDownload(
               }
 
               if (data.status === 'success') {
-                console.log('Download completed successfully')
+                logger.info('Download completed successfully')
 
                 // Remove from persisted state
                 if (persistedDownloads) {
@@ -186,7 +187,7 @@ export function useModelDownload(
               if (e.message && e.message.includes('error')) {
                 throw e
               }
-              console.error('Failed to parse pull data:', e, 'Line:', line)
+              logger.error('Failed to parse pull data:', e)
             }
           }
         }
@@ -199,12 +200,12 @@ export function useModelDownload(
     } catch (error: any) {
       // Don't show error if it was cancelled
       if (error.name === 'AbortError' || abortController.signal.aborted) {
-        console.log('Download was cancelled')
+        logger.debug('Download was cancelled')
         if (showNotification) {
           showNotification(`${modelName}のダウンロードをキャンセルしました`, 'info')
         }
       } else {
-        console.error('Failed to download model:', error)
+        logger.error('Failed to download model:', error)
         if (showNotification) {
           showNotification(`モデルのダウンロードに失敗しました: ${error.message || error}`, 'error')
         } else {
@@ -252,7 +253,7 @@ export function useModelDownload(
           }
         } catch (error: any) {
           // Partial model might not exist yet, that's okay
-          console.log('No partial download to delete (expected if download just started)')
+          logger.debug('No partial download to delete (expected if download just started)')
           if (showNotification) {
             showNotification(`${modelName}のダウンロードを停止しました`, 'info')
           }
@@ -328,7 +329,7 @@ export function useModelDownload(
 
       setPendingDeleteModel(null)
     } catch (error: any) {
-      console.error('Failed to delete model:', error)
+      logger.error('Failed to delete model:', error)
       alert(`モデルの削除に失敗しました: ${error.response?.data?.detail || error.message}`)
     } finally {
       setDeletingModels(prev => {

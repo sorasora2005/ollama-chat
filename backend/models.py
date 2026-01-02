@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -22,7 +22,7 @@ class ChatMessage(Base):
     content = Column(Text)
     model = Column(String, index=True)  # Model name used
     images = Column(JSON, nullable=True)  # Base64 encoded images array
-    is_cancelled = Column(Integer, default=0)  # Flag to indicate if generation was cancelled (0 = false, 1 = true)
+    is_cancelled = Column(Boolean, default=False)  # Flag to indicate if generation was cancelled
     prompt_tokens = Column(Integer, nullable=True)  # Number of prompt tokens
     completion_tokens = Column(Integer, nullable=True)  # Number of completion tokens
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -54,7 +54,7 @@ class Note(Base):
     model = Column(String, index=True)  # Model used to generate the note
     prompt = Column(Text)  # User's prompt/instruction for note generation
     labels = Column(JSON, nullable=True) # Array of labels for the note
-    is_deleted = Column(Integer, default=0) # Flag to indicate if note is in trash (0 = false, 1 = true)
+    is_deleted = Column(Boolean, default=False) # Flag to indicate if note is in trash
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User")
@@ -80,8 +80,8 @@ class PromptTemplate(Base):
     description = Column(Text, nullable=True)
     prompt_text = Column(Text, nullable=False)
     categories = Column(JSON, nullable=True)  # Array of category tags
-    is_favorite = Column(Integer, default=0)  # 0=false, 1=true
-    is_system_prompt = Column(Integer, default=0)  # Chat start vs mid-conversation
+    is_favorite = Column(Boolean, default=False)
+    is_system_prompt = Column(Boolean, default=False)  # Chat start vs mid-conversation
     use_count = Column(Integer, default=0)  # Track usage frequency
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

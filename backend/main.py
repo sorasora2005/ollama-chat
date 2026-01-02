@@ -4,6 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, engine, ensure_columns_exist
 from routers import models, users, chat, upload, feedback, notes, api_keys, scrape, news, prompts
+from logging_config import setup_logging, get_logger
+
+# Initialize logging
+setup_logging(log_level="INFO")
+logger = get_logger(__name__)
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -12,7 +17,7 @@ Base.metadata.create_all(bind=engine)
 try:
     ensure_columns_exist()
 except Exception as e:
-    print(f"Warning: Could not ensure columns exist: {e}")
+    logger.warning(f"Could not ensure columns exist: {e}")
 
 app = FastAPI(title="Ollama Chat API")
 

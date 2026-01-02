@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Message, ChatSession } from '../types'
 import { api } from '../utils/api'
+import { logger } from '../utils/logger'
 
 export function useChat(userId: number | null, selectedModel: string, setSelectedModel: (model: string) => void) {
   const router = useRouter()
@@ -58,7 +59,7 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
         router.replace(`/?${params.toString()}`, { scroll: false })
       }, 50)
     } catch (error) {
-      console.error('Failed to load chat history:', error)
+      logger.error('Failed to load chat history:', error)
     } finally {
       setLoadingHistory(false)
       setTimeout(() => {
@@ -72,7 +73,7 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
       const sessionsList = await api.getChatSessions(id)
       setSessions(sessionsList)
     } catch (error: any) {
-      console.error('Failed to load sessions:', error)
+      logger.error('Failed to load sessions:', error)
       if (error.response?.status === 404) {
         localStorage.removeItem('userId')
         localStorage.removeItem('username')
@@ -92,7 +93,7 @@ export function useChat(userId: number | null, selectedModel: string, setSelecte
       const results = await api.searchChatHistory(userId, query)
       setSearchResults(results)
     } catch (error) {
-      console.error('Failed to search:', error)
+      logger.error('Failed to search:', error)
       setSearchResults([])
     } finally {
       setSearchLoading(false)

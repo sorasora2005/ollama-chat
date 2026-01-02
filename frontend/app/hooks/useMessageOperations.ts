@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Message } from '../types'
+import { logger } from '../utils/logger'
 
 /**
  * Message operations hook
@@ -19,7 +20,7 @@ export function useMessageOperations() {
       setTimeout(() => setCopiedIndex(null), 2000)
       return true
     } catch (error) {
-      console.error('Failed to copy:', error)
+      logger.error('Failed to copy:', error)
       return false
     }
   }

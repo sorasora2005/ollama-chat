@@ -2,6 +2,9 @@
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from models import ChatMessage
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class MessageRepository:
@@ -102,7 +105,7 @@ class MessageRepository:
                 return True
             return False
         except Exception as e:
-            print(f"Error deleting message: {e}")
+            logger.error(f"Error deleting message: {e}", exc_info=True)
             return False
 
     def get_session_history(

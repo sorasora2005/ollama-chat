@@ -5,6 +5,9 @@ from pdf2image import convert_from_path
 import io
 import subprocess
 import shutil
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 UPLOAD_DIR = Path("/app/uploads")
 
@@ -95,7 +98,8 @@ async def convert_txt_to_images(txt_path: Path, file_id: str) -> list[str]:
         # Try to use a font, fallback to default
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-        except:
+        except (IOError, OSError) as e:
+            logger.debug(f"Could not load custom font, using default: {e}")
             font = ImageFont.load_default()
         
         # Draw text

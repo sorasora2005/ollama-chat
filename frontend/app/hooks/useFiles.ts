@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { UserFile } from '../types'
 import { api } from '../utils/api'
+import { logger } from '../utils/logger'
 
 export function useFiles(userId: number | null) {
   const [userFiles, setUserFiles] = useState<UserFile[]>([])
@@ -15,8 +16,8 @@ export function useFiles(userId: number | null) {
       const files = await api.getUserFiles(id)
       setUserFiles(files)
     } catch (error) {
-      console.error('Failed to load user files:', error)
-    } finally {
+      logger.error('Failed to load user files:', error)
+    } finally{
       setLoadingFiles(false)
     }
   }

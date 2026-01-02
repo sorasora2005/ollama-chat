@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Plus, Tag } from 'lucide-react'
+import { logger } from '../utils/logger'
 
 interface PromptTemplateCreateModalProps {
   isOpen: boolean
@@ -94,7 +95,7 @@ export default function PromptTemplateCreateModal({
       })
       onClose()
     } catch (error) {
-      console.error('Failed to create template:', error)
+      logger.error('Failed to create template:', error)
     } finally {
       setCreating(false)
     }

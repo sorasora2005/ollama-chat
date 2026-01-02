@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../utils/api'
 import { Newspaper, Calendar, ExternalLink, MessageSquare, X, Settings, Key, ArrowLeft, Search } from 'lucide-react'
 import ApiKeyManager from './ApiKeyManager'
+import { logger } from '../utils/logger'
 
 // Constants
 const CATEGORIES = [
@@ -119,7 +120,7 @@ export default function NewsList({ userId, onChatAboutArticle, activeArticle, on
       setNextPage(response.nextPage || null)
 
     } catch (err: any) {
-      console.error('Failed to fetch news:', err)
+      logger.error('Failed to fetch news:', err)
       if (err.response?.data?.detail === 'NEWS_API_KEY_MISSING' || err.response?.data?.detail === 'NEWS_API_KEY_INVALID') {
         setError('NEWS_API_KEY_MISSING')
       } else {

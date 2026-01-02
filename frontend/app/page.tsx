@@ -18,6 +18,7 @@ import { useNoteManagement } from './hooks/useNoteManagement'
 import { usePromptManagement } from './hooks/usePromptManagement'
 import { exportChatHistory, exportNote } from './utils/chatExport'
 import { scrollToBottom } from './utils/scrollUtils'
+import { logger } from './utils/logger'
 import UsernameModal from './components/UsernameModal'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -476,7 +477,7 @@ export default function Home() {
         images: response.images
       })
     } catch (error: any) {
-      console.error('Failed to upload file:', error)
+      logger.error('Failed to upload file:', error)
       alert(`ファイルアップロードに失敗しました: ${error.response?.data?.detail || error.message}`)
     } finally {
       setUploading(false)
@@ -549,7 +550,7 @@ export default function Home() {
       setModelStats(response.data.stats)
       setShowModelStats(true)
     } catch (error: any) {
-      console.error('Failed to load model stats:', error)
+      logger.error('Failed to load model stats:', error)
       showNotification(`モデル統計の取得に失敗しました: ${error.response?.data?.detail || error.message}`, 'error')
     }
   }
@@ -674,7 +675,7 @@ export default function Home() {
       showNotification('記事の読み込みが完了しました', 'success')
 
     } catch (error: any) {
-      console.error('Article scraping failed:', error)
+      logger.error('Article scraping failed:', error)
       // Fallback to basic info if scraping fails
       const contextText = `[参照URL: ${article.url}]\n[タイトル: ${article.title}]\n\nこの記事について教えてください。\n\n---記事の内容---\n${article.description || ''}\n${article.content || ''}`
       setInput(contextText)

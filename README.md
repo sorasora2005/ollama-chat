@@ -421,6 +421,8 @@ ollama-chat/
 │   │   ├── chat_service.py      # チャット処理オーケストレーション
 │   │   ├── message_repository.py # メッセージDB操作
 │   │   ├── model_detector.py     # クラウドモデル検出
+│   │   ├── api_key_validator.py  # 統一API検証サービス
+│   │   ├── note_generator.py     # ノート生成サービス
 │   │   └── cloud_providers/      # クラウドプロバイダー実装
 │   │       ├── base.py           # 抽象基底クラス
 │   │       ├── gemini.py         # Gemini API実装
@@ -428,7 +430,9 @@ ollama-chat/
 │   │       ├── claude.py         # Anthropic Claude API実装
 │   │       └── grok.py           # xAI Grok API実装
 │   ├── utils/             # ユーティリティ関数
-│   │   └── model_utils.py # モデル関連ユーティリティ
+│   │   ├── model_utils.py # モデル関連ユーティリティ
+│   │   └── text_utils.py  # テキスト処理ユーティリティ
+│   ├── logging_config.py  # ロギング設定
 │   └── alembic/           # データベースマイグレーション
 ├── frontend/               # フロントエンド（Next.js）
 │   ├── app/
@@ -481,6 +485,7 @@ ollama-chat/
 │   │   │   └── useUsers.ts             # ユーザー管理
 │   │   ├── utils/          # ユーティリティ関数
 │   │   │   ├── api.ts      # APIクライアント
+│   │   │   ├── logger.ts   # フロントエンドロガー
 │   │   │   ├── chatExport.ts
 │   │   │   ├── modelSize.ts
 │   │   │   └── scrollUtils.ts

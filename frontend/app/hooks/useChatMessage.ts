@@ -5,6 +5,7 @@ import { scrollToBottom, scrollToLastSentMessage } from '../utils/scrollUtils'
 import { useMessageStreaming } from './useMessageStreaming'
 import { useMessageCancellation } from './useMessageCancellation'
 import { useMessageOperations } from './useMessageOperations'
+import { logger } from '../utils/logger'
 
 export function useChatMessage(
   userId: number | null,
@@ -234,7 +235,7 @@ export function useChatMessage(
                     break
                   }
                 } catch (e) {
-                  console.error('Failed to parse SSE data:', e)
+                  logger.error('Failed to parse SSE data:', e)
                 }
               }
             }
@@ -321,7 +322,7 @@ export function useChatMessage(
         return
       }
 
-      console.error('Failed to send message:', error)
+      logger.error('Failed to send message:', error)
       assistantMessageIndexRef.current = null  // Reset on error
       abortControllerRef.current = null
       // Clear saved message content on error (not cancellation)

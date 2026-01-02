@@ -12,10 +12,21 @@ from schemas import ChatRequest
 from .model_detector import ModelDetector
 from .message_repository import MessageRepository
 from .cloud_providers import GeminiProvider, GPTProvider, ClaudeProvider, GrokProvider
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ChatService:
     """Main chat service orchestrator"""
+
+    # Provider handler method names
+    PROVIDER_HANDLERS = {
+        "gemini": "_handle_gemini",
+        "gpt": "_handle_gpt",
+        "claude": "_handle_claude",
+        "grok": "_handle_grok",
+    }
 
     def __init__(self, db: Session):
         self.db = db
@@ -34,19 +45,13 @@ class ChatService:
         """
         is_cloud, provider = self.model_detector.is_cloud_model(request.model)
 
-        if is_cloud and provider == "gemini":
-            async for event in self._handle_gemini(request):
-                yield event
-        elif is_cloud and provider == "gpt":
-            async for event in self._handle_gpt(request):
-                yield event
-        elif is_cloud and provider == "claude":
-            async for event in self._handle_claude(request):
-                yield event
-        elif is_cloud and provider == "grok":
-            async for event in self._handle_grok(request):
+        # Use dispatch pattern for provider routing
+        if is_cloud and provider in self.PROVIDER_HANDLERS:
+            handler_method = getattr(self, self.PROVIDER_HANDLERS[provider])
+            async for event in handler_method(request):
                 yield event
         else:
+            # Default to Ollama for local models
             async for event in self._handle_ollama(request):
                 yield event
 
@@ -299,7 +304,7 @@ class ChatService:
                                 )
                                 message_saved = True
                             except Exception as e:
-                                print(f"Error saving cancelled message: {e}")
+                                logger.error(f"Error saving cancelled message: {e}", exc_info=True)
                         raise
 
         except (asyncio.CancelledError, ConnectionError):
@@ -316,7 +321,7 @@ class ChatService:
                     )
                     message_saved = True
                 except Exception as e:
-                    print(f"Error saving cancelled message on disconnect: {e}")
+                    logger.error(f"Error saving cancelled message on disconnect: {e}", exc_info=True)
         except httpx.TimeoutException:
             if not message_saved:
                 self.message_repo.delete_message(user_message.id)

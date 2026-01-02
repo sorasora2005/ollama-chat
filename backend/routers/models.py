@@ -7,6 +7,9 @@ import urllib.parse
 
 from config import OLLAMA_BASE_URL
 from utils.model_utils import detect_family, detect_type, get_model_description, get_popular_models
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -23,9 +26,9 @@ async def get_models():
             if response.status_code == 200:
                 downloaded_models = response.json().get("models", [])
             else:
-                print(f"Ollama API returned status {response.status_code}: {response.text}")
+                logger.error(f"Ollama API returned status {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"Error fetching downloaded models from Ollama: {str(e)}")
+        logger.exception(f"Error fetching downloaded models from Ollama")
         downloaded_models = []
     
     # Create set for quick lookup (exact match only)

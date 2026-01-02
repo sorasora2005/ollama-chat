@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { BarChart3, MessageSquare, ThumbsUp, ThumbsDown, TrendingUp, Loader2, Search } from 'lucide-react'
 import { api } from '../utils/api'
+import { logger } from '../utils/logger'
 
 interface FeedbackStats {
   model: string
@@ -38,7 +39,7 @@ export default function StatsList({ userId, username }: StatsListProps) {
       const response = await api.getFeedbackStats(userId)
       setStats(response.stats)
     } catch (error: any) {
-      console.error('Failed to load stats:', error)
+      logger.error('Failed to load stats:', error)
     } finally {
       setLoading(false)
     }

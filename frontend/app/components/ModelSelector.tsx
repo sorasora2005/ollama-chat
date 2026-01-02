@@ -6,6 +6,7 @@ import { Model } from '../types'
 import { useCloudApiKeys } from '../hooks/useCloudApiKeys'
 import { useModelManagement } from '../hooks/useModelManagement'
 import ApiKeyManager from './ApiKeyManager'
+import { logger } from '../utils/logger'
 
 interface ModelSelectorProps {
   isOpen: boolean
@@ -80,7 +81,7 @@ export default function ModelSelector({
       setShowApiKeyModal(false)
       setSelectedProvider(null)
     } catch (error: any) {
-      console.error('Failed to save API key:', error)
+      logger.error('Failed to save API key:', error)
       // Error notification will be handled by useCloudApiKeys hook
       throw error
     } finally {
@@ -93,7 +94,7 @@ export default function ModelSelector({
       await deleteApiKey(provider)
       setApiKeyStates(prev => ({ ...prev, [provider]: false }))
     } catch (error: any) {
-      console.error('Failed to delete API key:', error)
+      logger.error('Failed to delete API key:', error)
     }
   }
 

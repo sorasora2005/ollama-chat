@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { DownloadProgress, PersistedDownloads } from '../types'
+import { logger } from '../utils/logger'
 
 const STORAGE_KEY = 'ollama_downloads'
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000 // 24 hours
@@ -31,11 +32,11 @@ export function usePersistedDownloads() {
         // Log stale downloads that were removed
         const staleCount = Object.keys(parsed.downloads || {}).length - Object.keys(validDownloads).length
         if (staleCount > 0) {
-          console.log(`Removed ${staleCount} stale download(s) (>24h old)`)
+          logger.debug(`Removed ${staleCount} stale download(s) (>24h old)`)
         }
       }
     } catch (error) {
-      console.error('Failed to load persisted downloads:', error)
+      logger.error('Failed to load persisted downloads:', error)
       // Clear corrupted data
       localStorage.removeItem(STORAGE_KEY)
     }
@@ -53,7 +54,7 @@ export function usePersistedDownloads() {
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     } catch (error) {
-      console.error('Failed to save persisted downloads:', error)
+      logger.error('Failed to save persisted downloads:', error)
     }
   }, [downloads, isInitialized])
 
@@ -65,7 +66,7 @@ export function usePersistedDownloads() {
           const parsed: PersistedDownloads = JSON.parse(e.newValue)
           setDownloads(parsed.downloads || {})
         } catch (error) {
-          console.error('Failed to parse storage event:', error)
+          logger.error('Failed to parse storage event:', error)
         }
       } else if (e.key === STORAGE_KEY && !e.newValue) {
         // Storage was cleared

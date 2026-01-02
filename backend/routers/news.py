@@ -7,6 +7,9 @@ from typing import List, Optional
 
 from database import get_db
 from models import CloudApiKey
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/api/news",
@@ -47,12 +50,12 @@ async def get_top_headlines(
     ).first()
     
     api_key = api_key_entry.api_key if api_key_entry else None
-    
-    print(f"DEBUG: user_id={user_id}, api_key_found={bool(api_key)}")
+
+    logger.debug(f"News API request - user_id={user_id}, api_key_found={bool(api_key)}")
 
     # 2. If no key found, raise error
     if not api_key:
-        print("DEBUG: API Key missing, raising 400")
+        logger.debug("News API Key missing, raising 400 error")
         raise HTTPException(
             status_code=400, 
             detail="NEWS_API_KEY_MISSING" # Specific error code for frontend to handle
@@ -119,7 +122,7 @@ async def get_top_headlines(
         )
         
     except requests.RequestException as e:
-        print(f"DEBUG: NewsData API Error: {str(e)}")
+        logger.error(f"NewsData API Error: {str(e)}", exc_info=True)
         if isinstance(e, requests.HTTPError) and e.response.status_code == 401:
              raise HTTPException(status_code=401, detail="NEWS_API_KEY_INVALID")
         raise HTTPException(status_code=500, detail=f"Failed to fetch news: {str(e)}")

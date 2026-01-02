@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Model } from '../types'
 import { api } from '../utils/api'
+import { logger } from '../utils/logger'
 
 export function useModels() {
   const [models, setModels] = useState<Model[]>([])
@@ -101,7 +102,7 @@ export function useModels() {
         }
       }
     } catch (error) {
-      console.error('Failed to load models:', error)
+      logger.error('Failed to load models:', error)
     } finally {
       setLoadingModels(false)
     }

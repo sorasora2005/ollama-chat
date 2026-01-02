@@ -4,10 +4,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
+from collections import defaultdict
 
 from database import get_db
 from models import User, ChatMessage
 from schemas import ChatRequest
+from utils.text_utils import truncate_with_ellipsis
 from services.chat_service import ChatService
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -83,9 +85,9 @@ async def get_chat_sessions(user_id: int, db: Session = Depends(get_db)):
             ChatMessage.session_id == session.session_id,
             ChatMessage.role == "user"
         ).order_by(ChatMessage.created_at.asc()).first()
-        
-        title = first_user_msg.content[:50] + "..." if first_user_msg and len(first_user_msg.content) > 50 else (first_user_msg.content if first_user_msg else "New Chat")
-        
+
+        title = truncate_with_ellipsis(first_user_msg.content, 50) if first_user_msg else "New Chat"
+
         # Get the model used in this session (from first message)
         model_used = first_user_msg.model if first_user_msg and first_user_msg.model else None
         
@@ -102,65 +104,69 @@ async def get_chat_sessions(user_id: int, db: Session = Depends(get_db)):
 
 @router.get("/search/{user_id}")
 async def search_chat_history(user_id: int, q: str, db: Session = Depends(get_db)):
-    """Search chat history for a user"""
+    """Search chat history for a user - Optimized to avoid N+1 queries"""
     if not q or len(q.strip()) == 0:
         return {"results": []}
-    
+
     search_query = f"%{q.strip()}%"
-    
-    # Search in message content
+
+    # Single query to get all matching messages with session info
     matching_messages = db.query(ChatMessage).filter(
         ChatMessage.user_id == user_id,
         ChatMessage.content.ilike(search_query)
-    ).order_by(ChatMessage.created_at.desc()).all()
-    
-    # Group by session_id and get unique sessions
-    session_ids = set()
-    results = []
-    
+    ).order_by(ChatMessage.session_id, ChatMessage.created_at.asc()).all()
+
+    # Group messages by session_id in memory (more efficient than N queries)
+    sessions_map = defaultdict(list)
     for msg in matching_messages:
-        if msg.session_id and msg.session_id not in session_ids:
-            session_ids.add(msg.session_id)
-            
-            # Get session info
-            session_messages = db.query(ChatMessage).filter(
-                ChatMessage.session_id == msg.session_id,
-                ChatMessage.user_id == user_id
-            ).order_by(ChatMessage.created_at.asc()).all()
-            
-            # Get first user message as title
-            first_user_msg = next((m for m in session_messages if m.role == "user"), None)
-            title = first_user_msg.content[:50] + "..." if first_user_msg and len(first_user_msg.content) > 50 else (first_user_msg.content if first_user_msg else "New Chat")
-            
-            # Get the model used in this session
-            session_model = session_messages[0].model if session_messages and len(session_messages) > 0 else None
-            
-            # Get matching message snippet
-            matching_msg = next((m for m in session_messages if q.lower() in m.content.lower()), None)
-            snippet = ""
-            if matching_msg:
-                content_lower = matching_msg.content.lower()
-                query_lower = q.lower()
-                index = content_lower.find(query_lower)
-                if index >= 0:
-                    start = max(0, index - 50)
-                    end = min(len(matching_msg.content), index + len(q) + 50)
-                    snippet = matching_msg.content[start:end]
-                    if start > 0:
-                        snippet = "..." + snippet
-                    if end < len(matching_msg.content):
-                        snippet = snippet + "..."
-            
-            results.append({
-                "session_id": msg.session_id,
-                "title": title,
-                "snippet": snippet or title,
-                "created_at": session_messages[0].created_at.isoformat() if session_messages else msg.created_at.isoformat(),
-                "updated_at": session_messages[-1].created_at.isoformat() if session_messages else msg.created_at.isoformat(),
-                "message_count": len(session_messages),
-                "model": session_model
-            })
-    
+        if msg.session_id:
+            sessions_map[msg.session_id].append(msg)
+
+    # Build results from grouped data
+    results = []
+    seen_sessions = set()
+
+    for session_id, messages in sessions_map.items():
+        if session_id in seen_sessions:
+            continue
+        seen_sessions.add(session_id)
+
+        # Get first user message as title
+        first_user_msg = next((m for m in messages if m.role == "user"), None)
+        title = truncate_with_ellipsis(first_user_msg.content, 50) if first_user_msg else "New Chat"
+
+        # Get model from first message
+        session_model = messages[0].model if messages else None
+
+        # Get matching message snippet
+        matching_msg = next((m for m in messages if q.lower() in m.content.lower()), None)
+        snippet = ""
+        if matching_msg:
+            content_lower = matching_msg.content.lower()
+            query_lower = q.lower()
+            index = content_lower.find(query_lower)
+            if index >= 0:
+                start = max(0, index - 50)
+                end = min(len(matching_msg.content), index + len(q) + 50)
+                snippet = matching_msg.content[start:end]
+                if start > 0:
+                    snippet = "..." + snippet
+                if end < len(matching_msg.content):
+                    snippet = snippet + "..."
+
+        results.append({
+            "session_id": session_id,
+            "title": title,
+            "snippet": snippet or title,
+            "created_at": messages[0].created_at.isoformat(),
+            "updated_at": messages[-1].created_at.isoformat(),
+            "message_count": len(messages),
+            "model": session_model
+        })
+
+    # Sort by most recent
+    results.sort(key=lambda x: x["updated_at"], reverse=True)
+
     return {"results": results}
 
 @router.get("/files/{user_id}")

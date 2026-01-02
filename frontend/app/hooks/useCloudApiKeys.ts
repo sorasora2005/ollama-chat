@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CloudApiKeys } from '../types'
 import { api } from '../utils/api'
+import { logger } from '../utils/logger'
 
 const STORAGE_KEY = 'cloud_api_keys'
 
@@ -20,7 +21,7 @@ export function useCloudApiKeys(userId: number | null) {
           setApiKeys(JSON.parse(stored))
         }
       } catch (error) {
-        console.error('Failed to load API keys:', error)
+        logger.error('Failed to load API keys:', error)
       }
     }
   }, [userId])
@@ -39,7 +40,7 @@ export function useCloudApiKeys(userId: number | null) {
       })
       setApiKeys(keysMap)
     } catch (error) {
-      console.error('Failed to load API keys:', error)
+      logger.error('Failed to load API keys:', error)
     } finally {
       setLoading(false)
     }
@@ -53,7 +54,7 @@ export function useCloudApiKeys(userId: number | null) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newApiKeys))
       } catch (error) {
-        console.error('Failed to save API key:', error)
+        logger.error('Failed to save API key:', error)
       }
       return
     }
@@ -71,7 +72,7 @@ export function useCloudApiKeys(userId: number | null) {
       // Reload API keys from backend
       await loadApiKeys()
     } catch (error: any) {
-      console.error('Failed to save API key:', error)
+      logger.error('Failed to save API key:', error)
       throw error
     }
   }
@@ -85,7 +86,7 @@ export function useCloudApiKeys(userId: number | null) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newApiKeys))
       } catch (error) {
-        console.error('Failed to delete API key:', error)
+        logger.error('Failed to delete API key:', error)
       }
 
       // Clear default model if it uses this provider
@@ -109,7 +110,7 @@ export function useCloudApiKeys(userId: number | null) {
       // Reload API keys from backend
       await loadApiKeys()
     } catch (error) {
-      console.error('Failed to delete API key:', error)
+      logger.error('Failed to delete API key:', error)
       throw error
     }
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { UserInfo } from '../types'
 import { api } from '../utils/api'
+import { logger } from '../utils/logger'
 
 export function useUsers() {
   const [users, setUsers] = useState<UserInfo[]>([])
@@ -15,7 +16,7 @@ export function useUsers() {
       const usersList = await api.getUsers()
       setUsers(usersList)
     } catch (error) {
-      console.error('Failed to load users:', error)
+      logger.error('Failed to load users:', error)
       setUsers([])
     }
   }
@@ -38,7 +39,7 @@ export function useUsers() {
       await selectUser(newUser.id, name.trim())
       return newUser
     } catch (error: any) {
-      console.error('Failed to create user:', error)
+      logger.error('Failed to create user:', error)
       throw error
     }
   }
