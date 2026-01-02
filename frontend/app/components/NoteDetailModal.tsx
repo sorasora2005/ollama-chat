@@ -1,6 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import rehypeRaw from 'rehype-raw'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 import { X, ExternalLink, Download, Trash2, RotateCcw, Tag, Plus } from 'lucide-react'
 import { Note } from '../types'
 
@@ -233,10 +238,31 @@ export default function NoteDetailModal({
               </div>
             </div>
           )}
-          <div className="prose dark:prose-invert max-w-none">
-            <div className="whitespace-pre-wrap text-black dark:text-white">
-              {note.content || '生成中...'}
-            </div>
+          <div className="prose dark:prose-invert max-w-none py-4 px-2">
+            <ReactMarkdown
+              children={note.content || '生成中...'}
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                code({ node, inline, className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '')
+                  return !inline && match ? (
+                    <SyntaxHighlighter
+                      style={oneDark}
+                      language={match[1]}
+                      PreTag="div"
+                      {...props}
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  )
+                }
+              }}
+            />
           </div>
         </div>
       </div>

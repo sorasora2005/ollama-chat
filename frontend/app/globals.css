@@ -107,3 +107,47 @@ body {
   animation: bubbleUp 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
+/* Markdown content styling */
+.markdown-content {
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.markdown-content p {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
+.markdown-content pre {
+  margin: 0;
+  padding: 0;
+}
+
+.markdown-content a {
+  color: #3b82f6;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.dark .markdown-content a {
+  color: #60a5fa;
+}
+
+/* Ensure code blocks have proper scrolling */
+.markdown-content pre > div {
+  overflow-x: auto;
+  max-width: 100%;
+}
+

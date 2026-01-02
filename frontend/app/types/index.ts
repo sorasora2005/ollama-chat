@@ -65,6 +65,7 @@ export interface CloudApiKeys {
   gpt?: string
   grok?: string
   claude?: string
+  newsapi?: string
 }
 
 export interface DownloadProgress {

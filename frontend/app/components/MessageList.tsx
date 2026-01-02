@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Copy, RotateCcw, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Message } from '../types'
+import { MessageContent } from './MessageContent'
 
 interface MessageListProps {
   messages: Message[]
@@ -182,15 +183,15 @@ export default function MessageList({
                               前へ
                             </button>
                             <div className="text-sm text-gray-600 dark:text-gray-400">
-                              {pageIndex + 1} / {message.images.length}
+                              {pageIndex + 1} / {message.images!.length}
                             </div>
                             <button
                               onClick={() => {
                                 const newCurrentPage = new Map(currentPage);
-                                newCurrentPage.set(messageId, Math.min(message.images.length - 1, pageIndex + 1));
+                                newCurrentPage.set(messageId, Math.min(message.images!.length - 1, pageIndex + 1));
                                 setCurrentPage(newCurrentPage);
                               }}
-                              disabled={pageIndex === message.images.length - 1}
+                              disabled={pageIndex === message.images!.length - 1}
                               className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               次へ
@@ -200,9 +201,7 @@ export default function MessageList({
                       </div>
                     )
                   })()}
-                  <div className="whitespace-pre-wrap" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                    {getDisplayContent(message.content, message.id || `msg-${index}`)}
-                  </div>
+                  <MessageContent content={getDisplayContent(message.content, message.id || `msg-${index}`)} />
                 </div>
               ) : (
                 <div
@@ -237,15 +236,15 @@ export default function MessageList({
                               前へ
                             </button>
                             <div className="text-sm text-gray-600 dark:text-gray-400">
-                              {pageIndex + 1} / {message.images.length}
+                              {pageIndex + 1} / {message.images!.length}
                             </div>
                             <button
                               onClick={() => {
                                 const newCurrentPage = new Map(currentPage);
-                                newCurrentPage.set(messageId, Math.min(message.images.length - 1, pageIndex + 1));
+                                newCurrentPage.set(messageId, Math.min(message.images!.length - 1, pageIndex + 1));
                                 setCurrentPage(newCurrentPage);
                               }}
-                              disabled={pageIndex === message.images.length - 1}
+                              disabled={pageIndex === message.images!.length - 1}
                               className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               次へ
@@ -255,9 +254,7 @@ export default function MessageList({
                       </div>
                     )
                   })()}
-                  <div className="whitespace-pre-wrap" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                    {message.content}
-                  </div>
+                  <MessageContent content={message.content} />
                   {message.is_cancelled && (
                     <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
                       ⚠️ 生成途中でキャンセルされました

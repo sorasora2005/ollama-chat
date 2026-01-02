@@ -74,7 +74,7 @@ export default function ModelList({ userId, loading }: ModelListProps) {
     setShowApiKeyModal(true)
   }
 
-  const handleSaveApiKey = async (provider: 'gemini' | 'gpt' | 'grok' | 'claude', apiKey: string) => {
+  const handleSaveApiKey = async (provider: 'gemini' | 'gpt' | 'grok' | 'claude' | 'newsapi', apiKey: string) => {
     setUpdatingApiProvider(provider)
     try {
       await saveApiKey(provider, apiKey)
@@ -513,7 +513,9 @@ export default function ModelList({ userId, loading }: ModelListProps) {
 
       <DeleteConfirmModal
         isOpen={showDeleteConfirm}
-        modelName={pendingDeleteModel}
+        title={pendingDeleteModel}
+        description={`モデル「${pendingDeleteModel}」を削除しますか？`}
+        confirmText="削除"
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
       />

@@ -73,7 +73,7 @@ export default function ModelSelector({
     setShowApiKeyModal(true)
   }
 
-  const handleSaveApiKey = async (provider: 'gemini' | 'gpt' | 'grok' | 'claude', apiKey: string) => {
+  const handleSaveApiKey = async (provider: 'gemini' | 'gpt' | 'grok' | 'claude' | 'newsapi', apiKey: string) => {
     setTestingApiKey(true)
     try {
       await saveApiKey(provider, apiKey)

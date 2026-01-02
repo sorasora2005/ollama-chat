@@ -51,6 +51,7 @@ https://github.com/user-attachments/assets/b468ca8c-7c8d-48cc-b9c3-ee322ae3dce0
 - 🌐 **URL取得機能** - ウェブページのコンテンツを取得してチャットに含めることが可能
 - 🤖 **モデル管理ページ** - 専用ページでのモデルのダウンロード、削除、詳細確認
 - ✨ **プロンプトテンプレート** - 再利用可能なプロンプトを作成・管理し、チャット画面から素早く適用（Cmd/Ctrl+J）
+- 💎 **Markdown/コード表示の強化**: チャットやノートのMarkdown・コードブロックが美しく表示されます（react-markdown,react-syntax-highlighter等を導入）
 
 ## 必要な環境
 
@@ -215,6 +216,10 @@ start.bat
 - **Tailwind CSS** - スタイリング
 - **Axios** - HTTPクライアント
 - **Lucide React** - アイコンライブラリ
+- **react-markdown** - Markdownレンダリング
+- **react-syntax-highlighter** - コードブロックのシンタックスハイライト
+- **rehype-raw** - Markdown内のHTMLサポート
+- **remark-gfm** - GFM（GitHub Flavored Markdown）拡張
 
 ### バックエンド
 - **FastAPI** - Python Webフレームワーク
@@ -308,6 +313,7 @@ start.bat
 
 **フロントエンド**:
 - **コンポーネント分離**: UIコンポーネントを機能別に分離（`components/`）
+  - `.markdown-content` クラスによるMarkdown/コード表示のUI強化（グローバルCSSで装飾）
   - `ApiKeyManager`: 再利用可能なAPIキー管理モーダル
   - `ModelList`, `ModelSelector`: モデル選択とダウンロード管理
   - `MultiModelSelector`: モデル比較用の複数モデル選択モーダル
