@@ -356,8 +356,8 @@ export default function Home() {
   // Handle model change - start new chat when model changes
   const handleModelChange = (newModel: string) => {
     // If the model is different from the current one, start a new chat
-    // But don't create new chat if search window is open
-    if (newModel !== selectedModel && !showSearch) {
+    // But don't create new chat if search window is open or if we're on the news page
+    if (newModel !== selectedModel && !showSearch && pathname !== '/news') {
       handleCreateNewChat()
     }
     setSelectedModel(newModel)
@@ -804,6 +804,7 @@ export default function Home() {
           onShowNoteSearch={() => setShowNoteSearch(true)}
           pathname={pathname}
           activeDownloads={persistedDownloads.activeDownloads}
+          newsChatArticle={newsChatArticle}
           onStopDownload={pauseDownload}
         />
 

@@ -26,6 +26,7 @@ interface TopBarProps {
   pathname?: string
   activeDownloads?: DownloadProgress[]
   onStopDownload?: (modelName: string) => void
+  newsChatArticle?: any | null
 }
 
 export default function TopBar({
@@ -48,6 +49,7 @@ export default function TopBar({
   onCreateNewChat,
   onCreateNote,
   onShowNoteSearch,
+  newsChatArticle,
   pathname,
   activeDownloads,
   onStopDownload,
@@ -99,8 +101,8 @@ export default function TopBar({
               <Download className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             </button>
           )}
-          {/* Model Selector - Hide on model management, statistics, notes, and files pages */}
-          {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && (
+          {/* Model Selector - Hide on model management, statistics, notes, and files pages. Also hide on news list (only show when chatting about a news article) */}
+          {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && (pathname !== '/news' || newsChatArticle) && (
             <>
               <button
                 onClick={() => setShowModelSelector(!showModelSelector)}
