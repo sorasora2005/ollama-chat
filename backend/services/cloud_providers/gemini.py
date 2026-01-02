@@ -65,7 +65,10 @@ class GeminiProvider(CloudProviderBase):
         )
 
         try:
-            # Build conversation history
+
+            import base64
+            from google.genai import types
+
             contents = []
             history = repo.get_session_history(
                 user_id=request.user_id,
@@ -75,28 +78,28 @@ class GeminiProvider(CloudProviderBase):
             )
 
             for msg in history:
-                parts = [{"text": msg.content}]
+                # テキスト部分
+                parts = [msg.content]
+                # 画像部分
                 if msg.images:
                     for img_base64 in msg.images:
-                        img_data = img_base64.split(",")[1] if "," in img_base64 else img_base64
-                        parts.append({"inline_data": {"mime_type": "image/jpeg", "data": img_data}})
-                contents.append({"role": "user" if msg.role == "user" else "model", "parts": parts})
+                        img_data = img_base64.split(",", 1)[1] if "," in img_base64 else img_base64
+                        img_bytes = base64.b64decode(img_data)
+                        parts.append(types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"))
+                contents.extend(parts)
 
-            # Add current message
-            current_parts = [{"text": request.message}]
+            # 現在のメッセージ
+            current_parts = [request.message]
             if request.images:
                 for img_base64 in request.images:
-                    img_data = img_base64.split(",")[1] if "," in img_base64 else img_base64
-                    current_parts.append({"inline_data": {"mime_type": "image/jpeg", "data": img_data}})
-            contents.append({"role": "user", "parts": current_parts})
+                    img_data = img_base64.split(",", 1)[1] if "," in img_base64 else img_base64
+                    img_bytes = base64.b64decode(img_data)
+                    current_parts.append(types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"))
+            contents.extend(current_parts)
 
-            # Prepare Gemini request
             gemini_model = self.get_model_name(request.model)
-            
-            # Initialize client
             client = genai.Client(api_key=api_key)
 
-            # Call Gemini API
             response = await client.aio.models.generate_content(
                 model=gemini_model,
                 contents=contents,

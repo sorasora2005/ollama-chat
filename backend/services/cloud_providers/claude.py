@@ -84,15 +84,16 @@ class ClaudeProvider(CloudProviderBase):
                 content = []
                 if msg.images:
                     for img_base64 in msg.images:
-                        # Anthropic expects just the base64 data and mime type
-                        media_type = "image/jpeg"
+                        # Anthropic expects just the base64 data and correct mime type
+                        # アップロード処理では常にPNGとして保存しているため、デフォルトはimage/pngにする
+                        media_type = "image/png"
                         data = img_base64
                         if img_base64.startswith("data:"):
                             match = re.match(r"data:([^;]+);base64,(.*)", img_base64)
                             if match:
                                 media_type = match.group(1)
                                 data = match.group(2)
-                        
+
                         content.append({
                             "type": "image",
                             "source": {
@@ -114,18 +115,24 @@ class ClaudeProvider(CloudProviderBase):
                 else:
                     messages.append({"role": msg.role, "content": content})
 
-            # Add current message
+            # Add current message (API docs準拠: 画像→テキスト順、複数画像はImage 1:等を挟む)
             current_content = []
-            if request.images:
-                for img_base64 in request.images:
-                    media_type = "image/jpeg"
+            if request.images and len(request.images) > 0:
+                for idx, img_base64 in enumerate(request.images):
+                    # 複数画像ならImage 1:, Image 2:...のテキストを挟む（Anthropicドキュメント準拠）
+                    if len(request.images) > 1:
+                        current_content.append({
+                            "type": "text",
+                            "text": f"Image {idx+1}:"
+                        })
+                    # デフォルトはPNG、data:URI形式ならそこからmedia_typeとdataを抽出
+                    media_type = "image/png"
                     data = img_base64
                     if img_base64.startswith("data:"):
                         match = re.match(r"data:([^;]+);base64,(.*)", img_base64)
                         if match:
                             media_type = match.group(1)
                             data = match.group(2)
-                    
                     current_content.append({
                         "type": "image",
                         "source": {
@@ -134,9 +141,10 @@ class ClaudeProvider(CloudProviderBase):
                             "data": data
                         }
                     })
-            
+            # テキストは最後に追加
             current_content.append({"type": "text", "text": request.message})
-            
+
+            # user roleのcontentとして追加
             if messages and messages[-1]["role"] == "user":
                 last_content = messages[-1]["content"]
                 if isinstance(last_content, list):
