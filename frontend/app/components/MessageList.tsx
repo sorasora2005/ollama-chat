@@ -35,6 +35,7 @@ export default function MessageList({
 }: MessageListProps) {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
   const [feedbackStates, setFeedbackStates] = useState<Map<string, 'positive' | 'negative' | null>>(new Map())
+  const [currentPage, setCurrentPage] = useState<Map<string, number>>(new Map())
 
   const toggleMessageExpansion = (messageId: string) => {
     setExpandedMessages(prev => {
@@ -156,18 +157,44 @@ export default function MessageList({
                     const contentLower = message.content.toLowerCase()
                     const isPdf = filename.toLowerCase().endsWith('.pdf') ||
                       (contentLower.includes('.pdf') && (contentLower.includes('ファイル') || message.images.length > 1))
+                    const messageId = message.id || `msg-${index}`;
+                    const pageIndex = currentPage.get(messageId) ?? 0;
                     return (
                       <div className={`mb-3 space-y-2 ${isPdf ? 'border-2 border-red-500 rounded-lg p-2' : ''}`}>
                         <img
-                          key={0}
-                          src={`data:image/png;base64,${message.images[0]}`}
-                          alt={`Uploaded image`}
+                          key={pageIndex}
+                          src={`data:image/png;base64,${message.images[pageIndex]}`}
+                          alt={`Uploaded image page ${pageIndex + 1}`}
                           className="max-w-full rounded-lg"
                           style={{ maxHeight: '400px' }}
                         />
                         {message.images.length > 1 && (
-                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            +{message.images.length - 1}ページ
+                          <div className="flex justify-between items-center mt-2">
+                            <button
+                              onClick={() => {
+                                const newCurrentPage = new Map(currentPage);
+                                newCurrentPage.set(messageId, Math.max(0, pageIndex - 1));
+                                setCurrentPage(newCurrentPage);
+                              }}
+                              disabled={pageIndex === 0}
+                              className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              前へ
+                            </button>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {pageIndex + 1} / {message.images.length}
+                            </div>
+                            <button
+                              onClick={() => {
+                                const newCurrentPage = new Map(currentPage);
+                                newCurrentPage.set(messageId, Math.min(message.images.length - 1, pageIndex + 1));
+                                setCurrentPage(newCurrentPage);
+                              }}
+                              disabled={pageIndex === message.images.length - 1}
+                              className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              次へ
+                            </button>
                           </div>
                         )}
                       </div>
@@ -184,22 +211,50 @@ export default function MessageList({
                   }`}
                   style={isShortMessage ? {} : { wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
-                  {message.images && message.images.length > 0 && (
-                    <div className="mb-3 space-y-2">
-                      <img
-                        key={0}
-                        src={`data:image/png;base64,${message.images[0]}`}
-                        alt={`Uploaded image`}
-                        className="max-w-full rounded-lg"
-                        style={{ maxHeight: '400px' }}
-                      />
-                      {message.images.length > 1 && (
-                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          +{message.images.length - 1}ページ
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {message.images && message.images.length > 0 && (() => {
+                    const messageId = message.id || `msg-${index}`;
+                    const pageIndex = currentPage.get(messageId) ?? 0;
+                    return (
+                      <div className="mb-3 space-y-2">
+                        <img
+                          key={pageIndex}
+                          src={`data:image/png;base64,${message.images[pageIndex]}`}
+                          alt={`Uploaded image page ${pageIndex + 1}`}
+                          className="max-w-full rounded-lg"
+                          style={{ maxHeight: '400px' }}
+                        />
+                        {message.images.length > 1 && (
+                          <div className="flex justify-between items-center mt-2">
+                            <button
+                              onClick={() => {
+                                const newCurrentPage = new Map(currentPage);
+                                newCurrentPage.set(messageId, Math.max(0, pageIndex - 1));
+                                setCurrentPage(newCurrentPage);
+                              }}
+                              disabled={pageIndex === 0}
+                              className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              前へ
+                            </button>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {pageIndex + 1} / {message.images.length}
+                            </div>
+                            <button
+                              onClick={() => {
+                                const newCurrentPage = new Map(currentPage);
+                                newCurrentPage.set(messageId, Math.min(message.images.length - 1, pageIndex + 1));
+                                setCurrentPage(newCurrentPage);
+                              }}
+                              disabled={pageIndex === message.images.length - 1}
+                              className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              次へ
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                   <div className="whitespace-pre-wrap" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
                     {message.content}
                   </div>
