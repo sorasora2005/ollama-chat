@@ -41,8 +41,10 @@ import NoteDetailModal from './components/NoteDetailModal'
 import LabelManagementModal from './components/LabelManagementModal'
 import UrlInputModal from './components/UrlInputModal'
 import UrlPreviewModal from './components/UrlPreviewModal'
+import ComparisonView from './components/ComparisonView'
+import MultiModelSelector from './components/MultiModelSelector'
 import { api } from './utils/api'
-import { Note } from './types'
+import { Note, Message } from './types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -552,6 +554,36 @@ export default function Home() {
   // News Chat State
   const [newsChatArticle, setNewsChatArticle] = useState<any | null>(null)
 
+  // Comparison Mode State
+  const [comparisonMode, setComparisonMode] = useState(false)
+  const [selectedModelsForComparison, setSelectedModelsForComparison] = useState<string[]>([])
+  const [showMultiModelSelector, setShowMultiModelSelector] = useState(false)
+  const [modelResponses, setModelResponses] = useState<Array<{
+    model: string
+    messages: Message[]
+    loading: boolean
+    error?: string
+    responseTime?: number
+    tokens?: { prompt: number; completion: number }
+  }>>([])
+  const [comparisonCopiedIndex, setComparisonCopiedIndex] = useState<number | null>(null)
+  const comparisonStartTimeRef = useRef<Map<string, number>>(new Map())
+
+  // Check if all comparison models support images
+  const allComparisonModelsSupportImages = comparisonMode && selectedModelsForComparison.length > 0
+    ? selectedModelsForComparison.every(modelName => {
+        const model = models.find(m => m.name === modelName)
+        return model?.type === 'vision'
+      })
+    : false
+
+  // Clear uploaded file when in comparison mode without full vision support
+  useEffect(() => {
+    if (comparisonMode && !allComparisonModelsSupportImages && uploadedFile) {
+      setUploadedFile(null)
+    }
+  }, [comparisonMode, allComparisonModelsSupportImages, uploadedFile])
+
   // Handle Chat about Article
   const handleChatAboutArticle = async (article: any) => {
     // 1. Set the active article to show detailed view
@@ -600,6 +632,187 @@ export default function Home() {
   const handleBackToNews = () => {
     setNewsChatArticle(null)
     // Optional: Reset chat if needed, but keeping history might be better
+  }
+
+  // Comparison Mode Handlers
+  const handleToggleComparisonMode = () => {
+    const newMode = !comparisonMode
+    setComparisonMode(newMode)
+
+    if (newMode) {
+      // Entering comparison mode
+      if (selectedModelsForComparison.length < 2) {
+        // Open model selector if not enough models selected
+        setShowMultiModelSelector(true)
+      }
+      // Clear previous responses
+      setModelResponses([])
+    } else {
+      // Exiting comparison mode - clear comparison state
+      setModelResponses([])
+    }
+  }
+
+  const handleComparisonModelsChange = (models: string[]) => {
+    setSelectedModelsForComparison(models)
+    // Initialize model responses
+    setModelResponses(models.map(model => ({
+      model,
+      messages: [],
+      loading: false
+    })))
+  }
+
+  const handleCopyComparisonMessage = (content: string, modelIndex: number) => {
+    navigator.clipboard.writeText(content)
+    setComparisonCopiedIndex(modelIndex)
+    setTimeout(() => setComparisonCopiedIndex(null), 2000)
+  }
+
+  const handleRegenerateForModel = async (modelName: string) => {
+    // Find the last user message to regenerate
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop()
+    if (!lastUserMessage) return
+
+    // Send message just to this specific model
+    await sendMessageToModel(lastUserMessage.content, modelName, lastUserMessage.images)
+  }
+
+  // Send message to a specific model in comparison mode
+  const sendMessageToModel = async (message: string, modelName: string, images?: string[]) => {
+    if (!userId) return
+
+    // Update model response state - set loading
+    setModelResponses(prev => prev.map(mr =>
+      mr.model === modelName
+        ? { ...mr, loading: true, error: undefined, messages: [] }
+        : mr
+    ))
+
+    // Track start time
+    const startTime = Date.now()
+    comparisonStartTimeRef.current.set(modelName, startTime)
+
+    try {
+      const response = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          user_id: userId,
+          model: modelName,
+          session_id: currentSessionId,
+          images: images || uploadedFile?.images || []
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to get response')
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No reader available')
+
+      const decoder = new TextDecoder()
+      let accumulatedContent = ''
+      let finalTokens: { prompt: number; completion: number } | undefined
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              if (data.content) {
+                accumulatedContent += data.content
+
+                // Update the model's messages
+                setModelResponses(prev => prev.map(mr =>
+                  mr.model === modelName
+                    ? {
+                        ...mr,
+                        messages: [{
+                          role: 'assistant',
+                          content: accumulatedContent,
+                          timestamp: new Date().toISOString()
+                        }]
+                      }
+                    : mr
+                ))
+              }
+
+              if (data.done) {
+                const endTime = Date.now()
+                const responseTime = (endTime - startTime) / 1000
+
+                finalTokens = data.prompt_tokens && data.completion_tokens
+                  ? { prompt: data.prompt_tokens, completion: data.completion_tokens }
+                  : undefined
+
+                // Update with final state
+                setModelResponses(prev => prev.map(mr =>
+                  mr.model === modelName
+                    ? {
+                        ...mr,
+                        loading: false,
+                        responseTime,
+                        tokens: finalTokens
+                      }
+                    : mr
+                ))
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      setModelResponses(prev => prev.map(mr =>
+        mr.model === modelName
+          ? { ...mr, loading: false, error: error.message }
+          : mr
+      ))
+    }
+  }
+
+  // Send comparison message to all selected models
+  const handleSendComparisonMessage = async () => {
+    if (!input.trim() || selectedModelsForComparison.length < 2) return
+
+    const messageText = input
+    const messageImages = uploadedFile?.images
+
+    // Clear input and file
+    setInput('')
+    setUploadedFile(null)
+
+    // Add user message to all model responses
+    const userMessage: Message = {
+      role: 'user',
+      content: messageText,
+      timestamp: new Date().toISOString(),
+      images: messageImages
+    }
+
+    setModelResponses(prev => prev.map(mr => ({
+      ...mr,
+      messages: [...mr.messages, userMessage]
+    })))
+
+    // Also add to main messages for history
+    setMessages(prev => [...prev, userMessage])
+
+    // Send to all selected models in parallel
+    await Promise.all(
+      selectedModelsForComparison.map(model =>
+        sendMessageToModel(messageText, model, messageImages)
+      )
+    )
   }
 
   // Handle click outside model selector
@@ -756,6 +969,15 @@ export default function Home() {
         onClose={() => setSelectedFile(null)}
       />
 
+      <MultiModelSelector
+        isOpen={showMultiModelSelector}
+        selectedModels={selectedModelsForComparison}
+        models={models}
+        onModelsChange={handleComparisonModelsChange}
+        onClose={() => setShowMultiModelSelector(false)}
+        maxModels={4}
+      />
+
       <Sidebar
         sidebarOpen={sidebarOpen}
         isDarkMode={isDarkMode}
@@ -806,6 +1028,8 @@ export default function Home() {
           activeDownloads={persistedDownloads.activeDownloads}
           newsChatArticle={newsChatArticle}
           onStopDownload={pauseDownload}
+          comparisonMode={comparisonMode}
+          onToggleComparisonMode={handleToggleComparisonMode}
         />
 
         {/* Messages Area */}
@@ -1003,6 +1227,30 @@ export default function Home() {
                 searchQuery={noteSearchQuery}
               />
             </div>
+          ) : comparisonMode ? (
+            selectedModelsForComparison.length < 2 ? (
+              <div className="max-w-3xl mx-auto w-full flex flex-col items-center justify-center flex-1 text-center">
+                <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  モデル比較モード
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  比較するモデルを2つ以上選択してください
+                </p>
+                <button
+                  onClick={() => setShowMultiModelSelector(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  モデルを選択
+                </button>
+              </div>
+            ) : (
+              <ComparisonView
+                modelResponses={modelResponses}
+                onCopyMessage={handleCopyComparisonMessage}
+                onRegenerateForModel={handleRegenerateForModel}
+                copiedIndex={comparisonCopiedIndex}
+              />
+            )
           ) : loadingHistory ? (
             <div className="max-w-3xl mx-auto w-full flex flex-col items-center justify-center flex-1">
               <Loader2 className="w-8 h-8 text-gray-600 dark:text-gray-400 animate-spin" />
@@ -1027,7 +1275,7 @@ export default function Home() {
           )}
         </div>
 
-        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && (pathname !== '/news' || newsChatArticle) && (
+        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && (pathname !== '/news' || newsChatArticle) && !comparisonMode && (
           <MessageInput
             input={input}
             uploading={uploading}
@@ -1046,6 +1294,57 @@ export default function Home() {
             onKeyPress={handleKeyPress}
             onUrlClick={handleUrlClick}
           />
+        )}
+
+        {/* Comparison Mode Input */}
+        {comparisonMode && selectedModelsForComparison.length >= 2 && (
+          <div className="border-t border-gray-300 dark:border-gray-800 p-4">
+            <div className="max-w-5xl mx-auto">
+              {/* Selected Models Display */}
+              <div className="mb-3 flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-600 dark:text-gray-400">比較中:</span>
+                {selectedModelsForComparison.map((model, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs"
+                  >
+                    {model}
+                  </span>
+                ))}
+                <button
+                  onClick={() => setShowMultiModelSelector(true)}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  変更
+                </button>
+              </div>
+
+              {/* Message Input */}
+              <MessageInput
+                input={input}
+                uploading={uploading}
+                uploadedFile={uploadedFile}
+                loading={modelResponses.some(mr => mr.loading)}
+                userId={userId}
+                selectedModel={selectedModelsForComparison.join(', ')}
+                supportsImages={allComparisonModelsSupportImages}
+                textareaRef={textareaRef}
+                fileInputRef={fileInputRef}
+                onInputChange={setInput}
+                onFileUpload={handleFileUpload}
+                onRemoveFile={() => setUploadedFile(null)}
+                onSend={handleSendComparisonMessage}
+                onCancel={() => {}}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendComparisonMessage()
+                  }
+                }}
+                onUrlClick={handleUrlClick}
+              />
+            </div>
+          </div>
         )}
       </div>
 

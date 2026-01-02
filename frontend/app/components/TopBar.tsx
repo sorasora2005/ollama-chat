@@ -1,4 +1,4 @@
-import { Menu, Download, ChevronDown, BookOpen, Loader2, X, Search } from 'lucide-react'
+import { Menu, Download, ChevronDown, BookOpen, Loader2, X, Search, GitCompare } from 'lucide-react'
 import ModelSelector from './ModelSelector'
 import GlobalDownloadBadge from './GlobalDownloadBadge'
 import { Model, DownloadProgress } from '../types'
@@ -27,6 +27,8 @@ interface TopBarProps {
   activeDownloads?: DownloadProgress[]
   onStopDownload?: (modelName: string) => void
   newsChatArticle?: any | null
+  comparisonMode?: boolean
+  onToggleComparisonMode?: () => void
 }
 
 export default function TopBar({
@@ -53,6 +55,8 @@ export default function TopBar({
   pathname,
   activeDownloads,
   onStopDownload,
+  comparisonMode,
+  onToggleComparisonMode,
 }: TopBarProps) {
   return (
     <>
@@ -101,8 +105,22 @@ export default function TopBar({
               <Download className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             </button>
           )}
+          {/* Comparison Mode Toggle */}
+          {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && pathname !== '/news' && onToggleComparisonMode && (
+            <button
+              onClick={onToggleComparisonMode}
+              className={`w-10 h-10 flex items-center justify-center border border-gray-300 dark:border-gray-700 rounded-lg transition-colors ${
+                comparisonMode
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-white dark:bg-[#2d2d2d] hover:bg-gray-100 dark:hover:bg-[#3d3d3d] text-gray-700 dark:text-gray-300'
+              }`}
+              title={comparisonMode ? 'モデル比較モードをオフ' : 'モデル比較モードをオン'}
+            >
+              <GitCompare className="w-5 h-5" />
+            </button>
+          )}
           {/* Model Selector - Hide on model management, statistics, notes, and files pages. Also hide on news list (only show when chatting about a news article) */}
-          {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && (pathname !== '/news' || newsChatArticle) && (
+          {pathname !== '/models' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/files' && (pathname !== '/news' || newsChatArticle) && !comparisonMode && (
             <>
               <button
                 onClick={() => setShowModelSelector(!showModelSelector)}

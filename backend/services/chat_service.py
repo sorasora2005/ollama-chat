@@ -270,7 +270,17 @@ class ChatService:
                                         completion_tokens=completion_tokens
                                     )
                                     message_saved = True
-                                    yield f"data: {json.dumps({'done': True, 'message_id': assistant_msg.id, 'session_id': session_id})}\n\n"
+                                    # Include token counts in response
+                                    done_data = {
+                                        'done': True,
+                                        'message_id': assistant_msg.id,
+                                        'session_id': session_id
+                                    }
+                                    if prompt_tokens is not None:
+                                        done_data['prompt_tokens'] = prompt_tokens
+                                    if completion_tokens is not None:
+                                        done_data['completion_tokens'] = completion_tokens
+                                    yield f"data: {json.dumps(done_data)}\n\n"
                                     break
                             except json.JSONDecodeError:
                                 continue

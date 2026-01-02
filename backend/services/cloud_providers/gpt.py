@@ -182,12 +182,17 @@ class GPTProvider(CloudProviderBase):
                     completion_tokens=completion_tokens
                 )
 
-                return {
+                response_data = {
                     "content": full_message,
                     "session_id": session_id,
                     "message_id": assistant_msg.id,
                     "done": True,
                 }
+                if prompt_tokens is not None:
+                    response_data["prompt_tokens"] = prompt_tokens
+                if completion_tokens is not None:
+                    response_data["completion_tokens"] = completion_tokens
+                return response_data
 
         except httpx.TimeoutException:
             repo.delete_message(user_message.id)
