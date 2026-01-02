@@ -61,13 +61,30 @@ class Note(Base):
 
 class CloudApiKey(Base):
     __tablename__ = "cloud_api_keys"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     provider = Column(String, index=True)  # "gemini", "gpt", "grok", "claude"
     api_key = Column(Text)  # Encrypted API key
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    user = relationship("User")
+
+class PromptTemplate(Base):
+    __tablename__ = "prompt_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    prompt_text = Column(Text, nullable=False)
+    categories = Column(JSON, nullable=True)  # Array of category tags
+    is_favorite = Column(Integer, default=0)  # 0=false, 1=true
+    is_system_prompt = Column(Integer, default=0)  # Chat start vs mid-conversation
+    use_count = Column(Integer, default=0)  # Track usage frequency
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     user = relationship("User")
 

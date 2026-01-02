@@ -84,3 +84,17 @@ export interface PersistedDownloads {
   downloads: Record<string, DownloadProgress>
 }
 
+export interface PromptTemplate {
+  id: number
+  user_id: number
+  name: string
+  description?: string
+  prompt_text: string
+  categories?: string[]
+  is_favorite: number
+  is_system_prompt: number
+  use_count: number
+  created_at: string
+  updated_at: string
+}
+

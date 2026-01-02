@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Message, Model, ChatSession, UserInfo, UserFile, Note } from '../types'
+import { Message, Model, ChatSession, UserInfo, UserFile, Note, PromptTemplate } from '../types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -272,6 +272,79 @@ export const api = {
 
     const response = await axios.get(`${API_URL}/api/news`, { params })
     return response.data
+  },
+
+  // Prompt Templates
+  createPromptTemplate: async (request: {
+    user_id: number
+    name: string
+    description?: string
+    prompt_text: string
+    categories?: string[]
+    is_system_prompt?: number
+  }): Promise<PromptTemplate> => {
+    const response = await axios.post(`${API_URL}/api/prompts`, request)
+    return response.data
+  },
+
+  getPromptTemplates: async (userId: number): Promise<PromptTemplate[]> => {
+    const response = await axios.get(`${API_URL}/api/prompts/${userId}`)
+    return response.data.templates || []
+  },
+
+  getPromptTemplateDetail: async (templateId: number): Promise<PromptTemplate> => {
+    const response = await axios.get(`${API_URL}/api/prompts/detail/${templateId}`)
+    return response.data
+  },
+
+  updatePromptTemplate: async (
+    templateId: number,
+    updates: Partial<PromptTemplate>
+  ): Promise<PromptTemplate> => {
+    const response = await axios.put(`${API_URL}/api/prompts/${templateId}`, updates)
+    return response.data
+  },
+
+  deletePromptTemplate: async (templateId: number): Promise<void> => {
+    await axios.delete(`${API_URL}/api/prompts/${templateId}`)
+  },
+
+  searchPromptTemplates: async (userId: number, query: string): Promise<PromptTemplate[]> => {
+    const response = await axios.get(`${API_URL}/api/prompts/search/${userId}`, {
+      params: { q: query.trim() }
+    })
+    return response.data.results || []
+  },
+
+  toggleFavoritePromptTemplate: async (templateId: number): Promise<void> => {
+    await axios.post(`${API_URL}/api/prompts/${templateId}/favorite`)
+  },
+
+  incrementPromptTemplateUse: async (templateId: number): Promise<void> => {
+    await axios.post(`${API_URL}/api/prompts/${templateId}/increment-use`)
+  },
+
+  getAllPromptCategories: async (userId: number): Promise<string[]> => {
+    const response = await axios.get(`${API_URL}/api/prompts/categories/${userId}`)
+    return response.data.categories || []
+  },
+
+  sendMessageWithTemplate: async (request: {
+    user_id: number
+    message: string
+    template_id: number
+    model: string
+    session_id?: string
+    images?: string[]
+  }, signal?: AbortSignal): Promise<Response> => {
+    return fetch(`${API_URL}/api/chat/with-template`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+      signal,
+    })
   },
 }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import axios from 'axios'
-import { Loader2, Trash2, BookOpen, Tag, Search, Pin, Plus, X, RotateCcw, Eraser } from 'lucide-react'
+import { Loader2, Trash2, BookOpen, Tag, Search, Pin, Plus, X, RotateCcw, Eraser, Sparkles } from 'lucide-react'
 import { useTheme } from './hooks/useTheme'
 import { useUsers } from './hooks/useUsers'
 import { useModels } from './hooks/useModels'
@@ -15,6 +15,7 @@ import { useChatMessage } from './hooks/useChatMessage'
 import { useNotifications } from './hooks/useNotifications'
 import { usePageRouter } from './hooks/usePageRouter'
 import { useNoteManagement } from './hooks/useNoteManagement'
+import { usePromptManagement } from './hooks/usePromptManagement'
 import { exportChatHistory, exportNote } from './utils/chatExport'
 import { scrollToBottom } from './utils/scrollUtils'
 import UsernameModal from './components/UsernameModal'
@@ -36,9 +37,13 @@ import FileList from './components/FileList'
 import StatsList from './components/StatsList'
 import NoteList from './components/NoteList'
 import ModelList from './components/ModelList'
+import PromptList from './components/PromptList'
 import NoteCreateModal from './components/NoteCreateModal'
 import NoteDetailModal from './components/NoteDetailModal'
 import LabelManagementModal from './components/LabelManagementModal'
+import PromptTemplateCreateModal from './components/PromptTemplateCreateModal'
+import PromptTemplateEditModal from './components/PromptTemplateEditModal'
+import PromptTemplateApplyModal from './components/PromptTemplateApplyModal'
 import UrlInputModal from './components/UrlInputModal'
 import UrlPreviewModal from './components/UrlPreviewModal'
 import ComparisonView from './components/ComparisonView'
@@ -72,6 +77,9 @@ export default function Home() {
   const [showUrlPreview, setShowUrlPreview] = useState(false)
   const [scrapingUrl, setScrapingUrl] = useState(false)
   const [urlData, setUrlData] = useState<{ url: string, title: string, content: string } | null>(null)
+
+  // Prompt template apply modal state
+  const [showPromptApplyModal, setShowPromptApplyModal] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -251,12 +259,58 @@ export default function Home() {
     setShowEmptyTrashConfirm,
   } = useNoteManagement(userId, currentSessionId, pathname, username, showNotification)
 
+  // Prompt Management
+  const {
+    templates: promptTemplates,
+    allTemplates: allPromptTemplates,
+    favoriteTemplates: favoritePromptTemplates,
+    allCategories: promptCategories,
+    selectedCategory: selectedPromptCategory,
+    setSelectedCategory: setSelectedPromptCategory,
+    loadingTemplates: loadingPromptTemplates,
+    selectedTemplate: selectedPromptTemplate,
+    setSelectedTemplate: setSelectedPromptTemplate,
+    showCreateModal: showPromptCreateModal,
+    setShowCreateModal: setShowPromptCreateModal,
+    showEditModal: showPromptEditModal,
+    setShowEditModal: setShowPromptEditModal,
+    showDeleteConfirm: showPromptDeleteConfirm,
+    pendingDeleteTemplateId,
+    templateSearchQuery,
+    setTemplateSearchQuery,
+    templateSearchResults,
+    templateSearchLoading,
+    handleCreateTemplate,
+    handleUpdateTemplate,
+    handleToggleFavorite: handleTogglePromptFavorite,
+    handleDeleteTemplate,
+    handleConfirmDelete: handleConfirmPromptDelete,
+    handleCancelDelete: handleCancelPromptDelete,
+    handleApplyTemplate,
+    handleEditTemplate,
+  } = usePromptManagement(userId, pathname, showNotification)
+
   // Keyboard shortcut for Note Search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k' && pathname === '/notes') {
         e.preventDefault()
         noteSearchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [pathname])
+
+  // Keyboard shortcut for Prompt Template Apply Modal (Cmd/Ctrl+J)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only allow in chat view (not on special pages)
+      const isInChatView = pathname !== '/models' && pathname !== '/stats' && pathname !== '/files' && pathname !== '/notes' && pathname !== '/prompts' && pathname !== '/news'
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j' && isInChatView) {
+        e.preventDefault()
+        setShowPromptApplyModal(true)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -926,6 +980,52 @@ export default function Home() {
         pinnedLabels={pinnedLabels}
       />
 
+      <PromptTemplateCreateModal
+        isOpen={showPromptCreateModal}
+        onClose={() => setShowPromptCreateModal(false)}
+        onCreate={handleCreateTemplate}
+      />
+
+      <PromptTemplateEditModal
+        isOpen={showPromptEditModal}
+        template={selectedPromptTemplate}
+        onClose={() => {
+          setShowPromptEditModal(false)
+          setSelectedPromptTemplate(null)
+        }}
+        onUpdate={handleUpdateTemplate}
+      />
+
+      <DeleteConfirmModal
+        isOpen={showPromptDeleteConfirm}
+        title={allPromptTemplates.find(t => t.id === pendingDeleteTemplateId)?.name || 'テンプレート'}
+        description="このテンプレートを削除しますか？この操作は取り消せません。"
+        onConfirm={handleConfirmPromptDelete}
+        onCancel={handleCancelPromptDelete}
+      />
+
+      <PromptTemplateApplyModal
+        isOpen={showPromptApplyModal}
+        templates={allPromptTemplates}
+        favoriteTemplates={favoritePromptTemplates}
+        categories={promptCategories}
+        loading={loadingPromptTemplates}
+        onClose={() => setShowPromptApplyModal(false)}
+        onApply={(template) => {
+          handleApplyTemplate(template, (templateText) => {
+            // Apply template to current input
+            setInput(prevInput => {
+              // If there's existing input, append with newline
+              if (prevInput.trim()) {
+                return `${templateText}\n\n${prevInput}`
+              }
+              return templateText
+            })
+            showNotification(`テンプレート「${template.name}」を適用しました`, 'success')
+          })
+        }}
+      />
+
       <SearchModal
         isOpen={showSearch}
         searchQuery={searchQuery}
@@ -1226,6 +1326,98 @@ export default function Home() {
                 searchQuery={noteSearchQuery}
               />
             </div>
+          ) : pathname === '/prompts' ? (
+            <div className="max-w-4xl mx-auto w-full">
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-lg font-bold text-black dark:text-white">
+                      <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      <span>プロンプトテンプレート</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowPromptCreateModal(true)}
+                      className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      テンプレート作成
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                  <input
+                    type="text"
+                    value={templateSearchQuery}
+                    onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                    placeholder="テンプレートを検索..."
+                    className="w-full pl-11 pr-11 py-3 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-2xl text-sm text-black dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all shadow-sm"
+                  />
+                  {templateSearchQuery && (
+                    <button
+                      onClick={() => setTemplateSearchQuery('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-400"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter Chips */}
+                {promptCategories.length > 0 && (
+                  <div className="relative group">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                      <button
+                        onClick={() => setSelectedPromptCategory(null)}
+                        className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-all border ${selectedPromptCategory === null
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                          : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700'
+                          }`}
+                      >
+                        すべて
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedPromptCategory('__favorites__')}
+                        className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-all border ${selectedPromptCategory === '__favorites__'
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                          : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700'
+                          }`}
+                      >
+                        お気に入り
+                      </button>
+
+                      {promptCategories.map((category) => (
+                        <button
+                          key={category}
+                          onClick={() => setSelectedPromptCategory(category === selectedPromptCategory ? null : category)}
+                          className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-all border flex items-center gap-1.5 ${selectedPromptCategory === category
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700'
+                            }`}
+                        >
+                          <Tag className="w-3 h-3" />
+                          {category}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <PromptList
+                templates={templateSearchQuery ? templateSearchResults : (selectedPromptCategory === '__favorites__' ? favoritePromptTemplates : promptTemplates)}
+                loading={templateSearchQuery ? templateSearchLoading : loadingPromptTemplates}
+                searchQuery={templateSearchQuery}
+                selectedCategory={selectedPromptCategory}
+                onToggleFavorite={handleTogglePromptFavorite}
+                onEdit={handleEditTemplate}
+                onDelete={handleDeleteTemplate}
+              />
+            </div>
           ) : comparisonMode ? (
             selectedModelsForComparison.length < 2 ? (
               <div className="max-w-3xl mx-auto w-full flex flex-col items-center justify-center flex-1 text-center">
@@ -1276,7 +1468,24 @@ export default function Home() {
           )}
         </div>
 
-        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && (pathname !== '/news' || newsChatArticle) && !comparisonMode && (
+        {/* Floating Action Button for Prompt Templates (only in chat view) */}
+        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && pathname !== '/prompts' && pathname !== '/news' && !comparisonMode && (
+          <div className="fixed bottom-24 right-8 z-40">
+            <button
+              onClick={() => setShowPromptApplyModal(true)}
+              className="p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all group"
+              title="プロンプトテンプレートを適用 (Cmd/Ctrl+J)"
+            >
+              <Sparkles className="w-6 h-6" />
+              <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                プロンプトテンプレート
+                <kbd className="ml-2 px-1.5 py-0.5 bg-gray-800 rounded text-[10px]">⌘J</kbd>
+              </span>
+            </button>
+          </div>
+        )}
+
+        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && pathname !== '/prompts' && (pathname !== '/news' || newsChatArticle) && !comparisonMode && (
           <MessageInput
             input={input}
             uploading={uploading}

@@ -91,3 +91,39 @@ class ScrapeUrlResponse(BaseModel):
     content: str
     error: Optional[str] = None
 
+class PromptTemplateCreateRequest(BaseModel):
+    user_id: int
+    name: str
+    description: Optional[str] = None
+    prompt_text: str
+    categories: Optional[List[str]] = []
+    is_system_prompt: Optional[int] = 0
+
+class PromptTemplateUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    prompt_text: Optional[str] = None
+    categories: Optional[List[str]] = None
+    is_system_prompt: Optional[int] = None
+
+class PromptTemplateResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    description: Optional[str]
+    prompt_text: str
+    categories: Optional[List[str]]
+    is_favorite: int
+    is_system_prompt: int
+    use_count: int
+    created_at: str
+    updated_at: str
+
+class ChatWithTemplateRequest(BaseModel):
+    user_id: int
+    message: str
+    template_id: int
+    model: str
+    session_id: Optional[str] = None
+    images: Optional[List[str]] = None
+
