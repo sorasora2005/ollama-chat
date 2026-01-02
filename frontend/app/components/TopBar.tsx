@@ -81,8 +81,8 @@ export default function TopBar({
               onStop={onStopDownload || (() => { })}
             />
           )}
-          {/* Create Note Button */}
-          {currentSessionId && messagesLength > 0 && onCreateNote && (
+          {/* Create Note Button - Hide on news list */}
+          {currentSessionId && messagesLength > 0 && onCreateNote && (pathname !== '/news' || newsChatArticle) && (
             <button
               onClick={onCreateNote}
               className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
@@ -91,8 +91,8 @@ export default function TopBar({
               <BookOpen className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             </button>
           )}
-          {/* Export History Button */}
-          {currentSessionId && messagesLength > 0 && (
+          {/* Export History Button - Hide on news list */}
+          {currentSessionId && messagesLength > 0 && (pathname !== '/news' || newsChatArticle) && (
             <button
               onClick={onExportChatHistory}
               className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3d3d3d] transition-colors"
