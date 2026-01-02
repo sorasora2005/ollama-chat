@@ -31,7 +31,9 @@ def detect_type(model_name: str) -> str:
         "vl", "vision", "llava", "moondream", "bakllava", "minicpm-v", 
         "cogvlm", "paligemma", "ocr", "mplug", "internvl", "molmo",
         "llama-3.2-11b-vision", "llama-3.2-90b-vision", "pixtral",
-        "xuyu", "vision-llama", "vision-phi", "vision-mistral"
+        "xuyu", "vision-llama", "vision-phi", "vision-mistral",
+        # --- Grok image対応モデル ---
+        "grok-4-1-fast-non-reasoning", "grok-4-fast-non-reasoning", "grok-4-fast-non-reasoning", "grok-4-0709"
     ]
     if any(keyword in name_lower for keyword in vision_keywords):
         return "vision"
@@ -122,6 +124,17 @@ def get_model_description(model_name: str, model_type: str, family: str) -> str:
 def get_popular_models() -> List[Dict[str, str]]:
     """Get list of popular models"""
     return [
+        # Grok series (official xAI API names, vision対応)
+        {"name": "grok-4-1-fast-reasoning", "family": "grok", "type": "vision"},
+        {"name": "grok-4-1-fast-non-reasoning", "family": "grok", "type": "vision"},
+        {"name": "grok-4-0709", "family": "grok", "type": "vision"},
+        {"name": "grok-4-fast-reasoning", "family": "grok", "type": "vision"},
+        {"name": "grok-4-fast-non-reasoning", "family": "grok", "type": "vision"},
+        {"name": "grok-2-vision-1212", "family": "grok", "type": "vision"},
+        {"name": "grok-3-mini", "family": "grok", "type": "text"},
+        {"name": "grok-3", "family": "grok", "type": "text"},
+        {"name": "grok-2-1212", "family": "grok", "type": "text"},
+        {"name": "grok-beta", "family": "grok", "type": "text"},
         # Qwen series
         {"name": "qwen3-vl:latest", "family": "qwen", "type": "vision"},
         {"name": "qwen3-vl:2b", "family": "qwen", "type": "vision"},
