@@ -173,6 +173,7 @@ class DebateSessionResponse(BaseModel):
     updated_at: str
     completed_at: Optional[str]
     participants: List[DebateParticipantResponse]
+    has_evaluation: bool
 
     class Config:
         from_attributes = True

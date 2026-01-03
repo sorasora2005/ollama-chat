@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { DebateSession, DebateMessage, DebateState, DebateEvaluation } from '../types'
+import { DebateSession, DebateMessage, DebateState, DebateEvaluation, DebateVote } from '../types'
 import { api } from '../utils/api'
 import { logger } from '../utils/logger'
 
@@ -12,6 +12,7 @@ export function useDebateManagement(
   const [currentDebate, setCurrentDebate] = useState<DebateSession | null>(null)
   const [debateMessages, setDebateMessages] = useState<DebateMessage[]>([])
   const [debateEvaluations, setDebateEvaluations] = useState<DebateEvaluation[]>([])
+  const [debateVotes, setDebateVotes] = useState<DebateVote[]>([])
   const [debateState, setDebateState] = useState<DebateState>({
     currentRound: 1,
     currentTurn: 0,
@@ -21,7 +22,20 @@ export function useDebateManagement(
   const [loadingDebates, setLoadingDebates] = useState(false)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
+  const [isAnimating, setIsAnimating] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Cloudモデルかどうかを簡易判定（名前ベース）
+  const isCloudModelName = (name?: string | null): boolean => {
+    if (!name) return false
+    const lower = name.toLowerCase()
+    return (
+      lower.includes('gpt-') ||
+      lower.includes('claude') ||
+      lower.includes('gemini') ||
+      lower.includes('grok')
+    )
+  }
 
   /**
    * Load all debates for the user
@@ -77,6 +91,13 @@ export function useDebateManagement(
       // Load evaluations if completed
       if (debate.status === 'completed') {
         await loadEvaluations(debateId)
+        // ユーザー投票（理由含む）も読み込む
+        try {
+          const votes = await api.getDebateVotes(debateId)
+          setDebateVotes(votes)
+        } catch (voteError: any) {
+          logger.error('Failed to load debate votes:', voteError)
+        }
       }
     } catch (error: any) {
       logger.error('Failed to load debate:', error)
@@ -192,6 +213,17 @@ export function useDebateManagement(
   ) => {
     if (!currentDebate) return
 
+    // このターンの参加者とモデル名を特定
+    const participant = currentDebate.participants.find(p => p.id === participantId)
+    const isCloudTurn = isCloudModelName(participant?.model_name)
+
+    // クラウドモデルの応答ではタイピングアニメーションを有効化
+    setIsAnimating(isCloudTurn)
+
+    // ラウンド番号とターン番号は開始時の値を固定で使う
+    const turnRound = debateState.currentRound
+    const turnIndex = debateState.currentTurn
+
     setDebateState(prev => ({
       ...prev,
       isGenerating: true,
@@ -205,8 +237,8 @@ export function useDebateManagement(
         {
           debate_session_id: currentDebate.id,
           participant_id: participantId,
-          round_number: debateState.currentRound,
-          turn_number: debateState.currentTurn,
+          round_number: turnRound,
+          turn_number: turnIndex,
           moderator_prompt: moderatorPrompt
         },
         abortControllerRef.current.signal
@@ -219,6 +251,8 @@ export function useDebateManagement(
 
       const decoder = new TextDecoder()
       let accumulatedContent = ''
+      let typingInterval: ReturnType<typeof setInterval> | null = null
+      let doneEventData: any = null
 
       // Create temporary message for streaming display
       const tempMessage: DebateMessage = {
@@ -226,8 +260,8 @@ export function useDebateManagement(
         debate_session_id: currentDebate.id,
         participant_id: participantId,
         content: '',
-        round_number: debateState.currentRound,
-        turn_number: debateState.currentTurn,
+        round_number: turnRound,
+        turn_number: turnIndex,
         message_type: 'argument',
         prompt_tokens: null,
         completion_tokens: null,
@@ -251,27 +285,68 @@ export function useDebateManagement(
 
               if (data.content) {
                 accumulatedContent += data.content
-                // Update temp message with streaming content
-                setDebateMessages(prev =>
-                  prev.map(m =>
-                    m.id === -1 && m.turn_number === debateState.currentTurn
-                      ? { ...m, content: accumulatedContent }
-                      : m
+
+                // ローカル(Ollama)は従来通りストリーミング更新、
+                // クラウドモデルは後でタイピングアニメーションするためここでは反映しない
+                if (!isCloudTurn) {
+                  setDebateMessages(prev =>
+                    prev.map(m =>
+                      m.id === -1 && m.round_number === turnRound && m.turn_number === turnIndex
+                        ? { ...m, content: accumulatedContent }
+                        : m
+                    )
                   )
-                )
+                }
               }
 
               if (data.done) {
-                // Replace temp message with real message from server
-                await loadDebateMessages(currentDebate.id)
+                doneEventData = data
+
+                if (isCloudTurn) {
+                  // クラウドモデルは蓄積したテキストをタイピングアニメーションで表示
+                  const fullText = accumulatedContent
+                  let currentLength = 0
+
+                  typingInterval = setInterval(() => {
+                    currentLength += 1
+                    const nextContent = fullText.slice(0, currentLength)
+
+                    setDebateMessages(prev =>
+                      prev.map(m =>
+                        m.id === -1 && m.round_number === turnRound && m.turn_number === turnIndex
+                          ? { ...m, content: nextContent }
+                          : m
+                      )
+                    )
+
+                    if (currentLength >= fullText.length) {
+                      if (typingInterval) {
+                        clearInterval(typingInterval)
+                        typingInterval = null
+                      }
+
+                      // アニメーション完了
+                      setIsAnimating(false)
+
+                      // タイピング完了後、サーバー側の正式なメッセージで置き換え
+                      // （必要であればトークン数などを反映するために再取得）
+                      loadDebateMessages(currentDebate.id).catch(err => {
+                        logger.error('Failed to refresh debate messages after typing animation:', err)
+                      })
+                    }
+                  }, 10)
+                } else {
+                  // ローカルモデルは従来通り即時反映
+                  await loadDebateMessages(currentDebate.id)
+                }
 
                 // Advance to next turn
-                const nextTurn = debateState.currentTurn + 1
+                const nextTurn = turnIndex + 1
                 const participantCount = currentDebate.participants.length
                 const maxRounds = currentDebate.config?.max_rounds ?? 1
 
                 if (nextTurn >= participantCount) {
-                  const isLastRound = debateState.currentRound >= maxRounds
+                  const isLastRound = turnRound >= maxRounds
 
                   // Only when the final round has just finished, post an automatic summary message
                   if (isLastRound) {
@@ -279,7 +354,7 @@ export function useDebateManagement(
                       await api.sendModeratorMessage(
                         currentDebate.id,
                         'すべてのラウンドが終了しました。',
-                        debateState.currentRound
+                        turnRound
                       )
                       await loadDebateMessages(currentDebate.id)
                     } catch (error) {
@@ -313,6 +388,7 @@ export function useDebateManagement(
                   isGenerating: false,
                   currentParticipantId: null
                 }))
+                setIsAnimating(false)
               }
             } catch (e) {
               // Skip invalid JSON
@@ -333,6 +409,7 @@ export function useDebateManagement(
         isGenerating: false,
         currentParticipantId: null
       }))
+      setIsAnimating(false)
       // Remove temporary message on error
       setDebateMessages(prev => prev.filter(m => m.id !== -1))
     }
@@ -429,6 +506,13 @@ export function useDebateManagement(
       })
 
       await loadDebate(currentDebate.id)
+      // 投票直後に最新の投票一覧も取得
+      try {
+        const votes = await api.getDebateVotes(currentDebate.id)
+        setDebateVotes(votes)
+      } catch (voteError: any) {
+        logger.error('Failed to refresh debate votes:', voteError)
+      }
       showNotification('投票しました', 'success')
     } catch (error: any) {
       logger.error('Failed to vote:', error)
@@ -452,6 +536,7 @@ export function useDebateManagement(
       isGenerating: false,
       currentParticipantId: null
     }))
+    setIsAnimating(false)
     // Remove temporary streaming message
     setDebateMessages(prev => prev.filter(m => m.id !== -1))
   }
@@ -483,10 +568,12 @@ export function useDebateManagement(
     currentDebate,
     debateMessages,
     debateEvaluations,
+    debateVotes,
     debateState,
     loadingDebates,
     loadingMessages,
     evaluating,
+    isAnimating,
     loadDebates,
     loadDebate,
     createDebate,

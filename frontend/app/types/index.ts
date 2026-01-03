@@ -127,6 +127,7 @@ export interface DebateSession {
   updated_at: string
   completed_at: string | null
   participants: DebateParticipant[]
+  has_evaluation?: boolean
 }
 
 export interface DebateMessage {

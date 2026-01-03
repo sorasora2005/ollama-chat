@@ -397,6 +397,8 @@ async def delete_debate(debate_id: int, db: Session = Depends(get_db)):
 # Helper functions
 def _format_debate_response(debate: DebateSession) -> dict:
     """Format debate session for response"""
+    has_eval = bool(getattr(debate, "evaluations", None) and len(debate.evaluations) > 0)
+
     return {
         "id": debate.id,
         "creator_id": debate.creator_id,
@@ -419,7 +421,8 @@ def _format_debate_response(debate: DebateSession) -> dict:
                 "created_at": p.created_at.isoformat() if p.created_at else None
             }
             for p in sorted(debate.participants, key=lambda x: x.participant_order)
-        ]
+        ],
+        "has_evaluation": has_eval,
     }
 
 

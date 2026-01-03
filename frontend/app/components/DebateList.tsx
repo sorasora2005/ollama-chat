@@ -183,9 +183,17 @@ export default function DebateList({
                     <Clock className="w-3 h-3" />
                     <span>{relativeTime}</span>
                   </div>
-                  {debate.config?.max_rounds && (
-                    <span>最大{debate.config.max_rounds}ラウンド</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {debate.config?.max_rounds && (
+                      <span>最大{debate.config.max_rounds}ラウンド</span>
+                    )}
+                    {debate.has_evaluation && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-[10px] font-medium text-purple-700 dark:text-purple-200">
+                        <Trophy className="w-3 h-3" />
+                        評価済み
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )

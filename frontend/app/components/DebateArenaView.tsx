@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Play, Pause, CheckCircle, Send, StopCircle, Trophy, Trash2, Award, ChevronDown, Loader2 } from 'lucide-react'
-import { DebateSession, DebateMessage, DebateParticipant, DebateState, DebateEvaluation, Model } from '../types'
+import { DebateSession, DebateMessage, DebateParticipant, DebateState, DebateEvaluation, DebateVote, Model } from '../types'
 import DebateEvaluationPanel from './DebateEvaluationPanel'
 import ReactMarkdown from 'react-markdown'
 
@@ -10,11 +10,14 @@ interface DebateArenaViewProps {
   debate: DebateSession
   messages: DebateMessage[]
   evaluations: DebateEvaluation[]
+  votes?: DebateVote[]
   debateState: DebateState
   evaluating: boolean
+  isAnimating: boolean
   availableEvaluationModels: Model[]
   selectedEvaluationModelName: string | null
   onChangeEvaluationModel: (modelName: string) => void
+  currentUserId?: number | null
   onBack: () => void
   onStart: () => void
   onSendTurn: (participantId: number, moderatorPrompt?: string) => void
@@ -39,11 +42,14 @@ export default function DebateArenaView({
   debate,
   messages,
   evaluations,
+  votes,
   debateState,
   evaluating,
+  isAnimating,
   availableEvaluationModels,
   selectedEvaluationModelName,
   onChangeEvaluationModel,
+  currentUserId,
   onBack,
   onStart,
   onSendTurn,
@@ -127,6 +133,14 @@ export default function DebateArenaView({
     ? debate.participants.find(p => p.id === debate.winner_participant_id) || null
     : null
 
+  // 現在のユーザーの投票（コメント含む）
+  const userVote = votes && currentUserId
+    ? votes.find(v => v.user_id === currentUserId)
+    : undefined
+
+  // すべてのラウンドが終わったが、まだ「完了」ボタンが押されていない状態
+  const isCompletionPending = debate.status === 'active' && isDebateOver
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -135,7 +149,8 @@ export default function DebateArenaView({
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              disabled={isCompletionPending}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
@@ -319,6 +334,16 @@ export default function DebateArenaView({
                   です。
                 </span>
               )}
+              {userVote?.reasoning && (
+                <div className="mt-2 text-xs text-gray-700 dark:text-gray-200 bg-white/80 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                  <div className="font-semibold mb-1 text-gray-800 dark:text-gray-100">
+                    あなたのコメント
+                  </div>
+                  <div className="whitespace-pre-wrap leading-relaxed">
+                    {userVote.reasoning}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -414,7 +439,8 @@ export default function DebateArenaView({
                 </div>
                 <button
                   onClick={handleNextTurn}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  disabled={isAnimating}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Play className="w-4 h-4" />
                   次のターン
@@ -429,7 +455,15 @@ export default function DebateArenaView({
               type="text"
               value={moderatorInput}
               onChange={(e) => setModeratorInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendModeratorMessage()}
+              onKeyDown={(e) => {
+                const nativeEvent: any = e.nativeEvent
+                const isComposing = nativeEvent?.isComposing || (e as any).isComposing
+
+                if (e.key === 'Enter' && !isComposing) {
+                  e.preventDefault()
+                  handleSendModeratorMessage()
+                }
+              }}
               placeholder="モデレーターメッセージ（任意）"
               disabled={debateState.isGenerating}
               className="flex-1 px-3 py-2 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"

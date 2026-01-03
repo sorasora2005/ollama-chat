@@ -373,10 +373,12 @@ export default function Home() {
     currentDebate,
     debateMessages,
     debateEvaluations,
+    debateVotes,
     debateState,
     loadingDebates,
     loadingMessages,
     evaluating,
+    isAnimating,
     loadDebates,
     loadDebate,
     createDebate,
@@ -641,9 +643,12 @@ export default function Home() {
     }
   }
 
-  // Handle key press
+  // Handle key press (日本語IME変換中のEnterでは送信しない)
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    const nativeEvent: any = e.nativeEvent
+    const isComposing = nativeEvent?.isComposing || (e as any).isComposing
+
+    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault()
       handleSendWithFile()
     }
@@ -1597,8 +1602,11 @@ export default function Home() {
                 debate={currentDebate}
                 messages={debateMessages}
                 evaluations={debateEvaluations}
+                votes={debateVotes}
+                currentUserId={userId}
                 debateState={debateState}
                 evaluating={evaluating}
+                isAnimating={isAnimating}
                 availableEvaluationModels={availableEvaluationModels}
                 selectedEvaluationModelName={selectedEvaluationModelName}
                 onChangeEvaluationModel={handleChangeEvaluationModel}
@@ -1835,7 +1843,10 @@ export default function Home() {
                 onSend={handleSendComparisonMessage}
                 onCancel={() => { }}
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  const nativeEvent: any = e.nativeEvent
+                  const isComposing = nativeEvent?.isComposing || (e as any).isComposing
+
+                  if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
                     e.preventDefault()
                     handleSendComparisonMessage()
                   }
