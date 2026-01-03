@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import axios from 'axios'
 import { Loader2, Trash2, BookOpen, Tag, Search, Pin, Plus, X, RotateCcw, Eraser, Sparkles } from 'lucide-react'
 import { useTheme } from './hooks/useTheme'
@@ -16,6 +16,10 @@ import { useNotifications } from './hooks/useNotifications'
 import { usePageRouter } from './hooks/usePageRouter'
 import { useNoteManagement } from './hooks/useNoteManagement'
 import { usePromptManagement } from './hooks/usePromptManagement'
+import { useDebateManagement } from './hooks/useDebateManagement'
+import { useDefaultModel } from './hooks/useDefaultModel'
+import { useModelManagement } from './hooks/useModelManagement'
+import { useCloudApiKeys } from './hooks/useCloudApiKeys'
 import { exportChatHistory, exportNote } from './utils/chatExport'
 import { scrollToBottom } from './utils/scrollUtils'
 import { logger } from './utils/logger'
@@ -49,14 +53,18 @@ import UrlInputModal from './components/UrlInputModal'
 import UrlPreviewModal from './components/UrlPreviewModal'
 import ComparisonView from './components/ComparisonView'
 import MultiModelSelector from './components/MultiModelSelector'
+import DebateSetupModal from './components/DebateSetupModal'
+import DebateList from './components/DebateList'
+import DebateArenaView from './components/DebateArenaView'
 import { api } from './utils/api'
-import { Note, Message } from './types'
+import { Note, Message, DebateSession } from './types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function Home() {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { isDarkMode, toggleTheme } = useTheme()
   const [isInitialized, setIsInitialized] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -72,6 +80,9 @@ export default function Home() {
     conversation_count: number
   }> | null>(null)
   const [showModelStats, setShowModelStats] = useState(false)
+
+  // Debate deep-linking via URL query (?debateId=123)
+  const selectedDebateIdFromUrl = searchParams.get('debateId')
 
   // URL scraping state
   const [showUrlInput, setShowUrlInput] = useState(false)
@@ -158,6 +169,67 @@ export default function Home() {
   const { notification, setNotification, showNotification } = useNotifications()
 
   const persistedDownloads = usePersistedDownloads()
+
+  // モデル関連の共通ユーティリティとデフォルトモデル
+  const { defaultModel } = useDefaultModel()
+  const { isCloudModel, getApiProvider } = useModelManagement()
+  const { hasApiKey } = useCloudApiKeys(userId)
+
+  // クラウドAPIキーの有無をキャッシュ
+  const [apiKeyStates, setApiKeyStates] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    if (!userId) return
+
+    const loadApiKeyStates = async () => {
+      const providers: Array<'gemini' | 'gpt' | 'grok' | 'claude'> = ['gemini', 'gpt', 'grok', 'claude']
+      const states: Record<string, boolean> = {}
+
+      for (const provider of providers) {
+        try {
+          states[provider] = await hasApiKey(provider)
+        } catch {
+          states[provider] = false
+        }
+      }
+
+      setApiKeyStates(states)
+    }
+
+    loadApiKeyStates()
+    // hasApiKey はカスタムフック内で毎レンダー新しい関数として生成されるため、
+    // 依存配列に含めると無限ループになる。userId 変更時のみ再取得すれば十分。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
+
+  // ディベートで選択可能な「使える」モデル
+  const usableDebateModels = useMemo(
+    () =>
+      models.filter((m) => {
+        if (!m) return false
+        if (isCloudModel(m)) {
+          const provider = getApiProvider(m.family || '')
+          if (!provider) return false
+          return apiKeyStates[provider] === true
+        }
+        // ローカルモデルはダウンロード済みのみ
+        return !!m.downloaded
+      }),
+    [models, apiKeyStates, isCloudModel, getApiProvider]
+  )
+
+  // 評価に利用可能なモデル（クラウド + ダウンロード済みローカル）
+  const availableEvaluationModels = useMemo(
+    () => usableDebateModels,
+    [usableDebateModels]
+  )
+
+  // 評価用に使うモデル（ユーザーがデフォルトに設定しているものが利用可能ならそれを優先）
+  const evaluationModel = (() => {
+    if (!defaultModel) return null
+    if (!availableEvaluationModels.some(m => m.name === defaultModel)) return null
+    return defaultModel
+  })()
 
   const {
     showDownloadWarning,
@@ -291,6 +363,72 @@ export default function Home() {
     handleEditTemplate,
   } = usePromptManagement(userId, pathname, showNotification)
 
+  // Debate Management
+  const [showDebateSetupModal, setShowDebateSetupModal] = useState(false)
+  const [selectedEvaluationModelName, setSelectedEvaluationModelName] = useState<string | null>(null)
+  const [showDebateDeleteConfirm, setShowDebateDeleteConfirm] = useState(false)
+  const [pendingDeleteDebate, setPendingDeleteDebate] = useState<DebateSession | null>(null)
+  const {
+    debates,
+    currentDebate,
+    debateMessages,
+    debateEvaluations,
+    debateState,
+    loadingDebates,
+    loadingMessages,
+    evaluating,
+    loadDebates,
+    loadDebate,
+    createDebate,
+    startDebate,
+    sendDebateTurn,
+    sendModeratorMessage,
+    completeDebate,
+    runDebateEvaluation,
+    voteForWinner,
+    cancelTurn,
+    deleteDebate,
+    setCurrentDebate
+  } = useDebateManagement(userId, showNotification, evaluationModel)
+
+  // 評価モデルの初期選択（デフォルト設定または利用可能な最初のモデル）
+  useEffect(() => {
+    if (availableEvaluationModels.length === 0) return
+
+    // 既に選択済みで有効ならそのまま
+    if (selectedEvaluationModelName && availableEvaluationModels.some(m => m.name === selectedEvaluationModelName)) {
+      return
+    }
+
+    const initial =
+      evaluationModel && availableEvaluationModels.some(m => m.name === evaluationModel)
+        ? evaluationModel
+        : availableEvaluationModels[0]?.name || null
+
+    setSelectedEvaluationModelName(initial)
+  }, [availableEvaluationModels, evaluationModel])
+
+  // Load debates when accessing /debates page
+  useEffect(() => {
+    if (pathname === '/debates' && userId && !loadingDebates) {
+      loadDebates()
+    }
+  }, [pathname, userId])
+
+  // If a specific debateId is present in the URL, auto-open that debate
+  useEffect(() => {
+    if (pathname !== '/debates' || !userId) return
+
+    const idParam = selectedDebateIdFromUrl
+    if (!idParam) return
+
+    const id = Number(idParam)
+    if (!Number.isFinite(id)) return
+
+    // Load the specified debate when coming from a deep link
+    loadDebate(id)
+  }, [pathname, userId, selectedDebateIdFromUrl])
+
   // Keyboard shortcut for Note Search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -307,7 +445,7 @@ export default function Home() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only allow in chat view (not on special pages)
-      const isInChatView = pathname !== '/models' && pathname !== '/stats' && pathname !== '/files' && pathname !== '/notes' && pathname !== '/prompts' && pathname !== '/news'
+      const isInChatView = pathname !== '/models' && pathname !== '/stats' && pathname !== '/files' && pathname !== '/notes' && pathname !== '/prompts' && pathname !== '/news' && pathname !== '/debates'
 
       if ((e.metaKey || e.ctrlKey) && e.key === 'j' && isInChatView) {
         e.preventDefault()
@@ -889,6 +1027,115 @@ export default function Home() {
     }
   }, [showModelSelector])
 
+  // Debate handlers
+  const handleCreateDebate = async (
+    title: string,
+    topic: string,
+    participants: Array<{
+      model_name: string
+      position: string
+      participant_order: number
+      color: string
+    }>,
+    config: any
+  ) => {
+    const debate = await createDebate(title, topic, participants, config)
+    setShowDebateSetupModal(false)
+    if (debate) {
+      // ディベート作成直後から一意のURL（debateId付き）に遷移する
+      router.push(`/debates?debateId=${debate.id}`)
+      // 作成と同時にディベートを開始しておく
+      await startDebate(debate.id)
+    }
+  }
+
+  const handleStartDebate = async () => {
+    if (currentDebate) {
+      await startDebate(currentDebate.id)
+    }
+  }
+
+  const handleCompleteDebate = async () => {
+    // 完了時にそのまま評価まで実行する場合、評価モデルが必要
+    if (availableEvaluationModels.length === 0) {
+      showNotification('評価に使用できるモデルがありません。ローカルモデルをダウンロードするか、クラウドモデルのAPIキーを登録してください。', 'error')
+      return
+    }
+
+    const modelName =
+      selectedEvaluationModelName && availableEvaluationModels.some(m => m.name === selectedEvaluationModelName)
+        ? selectedEvaluationModelName
+        : evaluationModel && availableEvaluationModels.some(m => m.name === evaluationModel)
+          ? evaluationModel
+          : availableEvaluationModels[0]?.name || null
+
+    if (!modelName) return
+
+    setSelectedEvaluationModelName(modelName)
+    // ディベートがまだ完了していない場合は、完了と同時に評価を実行
+    if (currentDebate && currentDebate.status !== 'completed') {
+      await completeDebate(modelName)
+    }
+  }
+
+  // ディベート完了後に「AI評価を実行」ボタンから呼ばれる評価専用ハンドラ
+  const handleEvaluateDebate = async () => {
+    // 利用可能な評価モデルがなければエラー表示
+    if (availableEvaluationModels.length === 0) {
+      showNotification('評価に使用できるモデルがありません。ローカルモデルをダウンロードするか、クラウドモデルのAPIキーを登録してください。', 'error')
+      return
+    }
+
+    const modelName =
+      selectedEvaluationModelName && availableEvaluationModels.some(m => m.name === selectedEvaluationModelName)
+        ? selectedEvaluationModelName
+        : evaluationModel && availableEvaluationModels.some(m => m.name === evaluationModel)
+          ? evaluationModel
+          : availableEvaluationModels[0]?.name || null
+
+    if (!modelName) return
+
+    setSelectedEvaluationModelName(modelName)
+    await runDebateEvaluation(modelName)
+  }
+
+  // 評価モデルの選択変更（ディベート画面内の小さなセレクタ用）
+  const handleChangeEvaluationModel = (modelName: string) => {
+    if (!availableEvaluationModels.some(m => m.name === modelName)) return
+    setSelectedEvaluationModelName(modelName)
+  }
+
+  const handleBackToDebateList = () => {
+    setCurrentDebate(null)
+    // Remove debateId from URL when returning to list
+    if (pathname === '/debates') {
+      router.push('/debates')
+    }
+  }
+
+  const handleRequestDeleteDebate = (debate: DebateSession) => {
+    setPendingDeleteDebate(debate)
+    setShowDebateDeleteConfirm(true)
+  }
+
+  const handleConfirmDeleteDebate = async () => {
+    if (!pendingDeleteDebate) return
+    try {
+      await deleteDebate(pendingDeleteDebate.id)
+    } finally {
+      setShowDebateDeleteConfirm(false)
+      setPendingDeleteDebate(null)
+      if (currentDebate && currentDebate.id === pendingDeleteDebate.id) {
+        setCurrentDebate(null)
+      }
+    }
+  }
+
+  const handleCancelDeleteDebate = () => {
+    setShowDebateDeleteConfirm(false)
+    setPendingDeleteDebate(null)
+  }
+
   return (
     <div className="flex h-screen bg-white dark:bg-[#1a1a1a] text-black dark:text-white overflow-hidden">
       <UsernameModal
@@ -917,6 +1164,15 @@ export default function Home() {
           setShowDownloadSuccess(false)
           setCompletedDownloadModel(null)
         }}
+      />
+
+      <DeleteConfirmModal
+        isOpen={showDebateDeleteConfirm}
+        title={pendingDeleteDebate?.title || null}
+        description={pendingDeleteDebate ? `「${pendingDeleteDebate.title}」のディベートを削除しますか？この操作は取り消せません。` : undefined}
+        confirmText="削除する"
+        onConfirm={handleConfirmDeleteDebate}
+        onCancel={handleCancelDeleteDebate}
       />
 
       <UrlInputModal
@@ -1076,6 +1332,14 @@ export default function Home() {
         onModelsChange={handleComparisonModelsChange}
         onClose={() => setShowMultiModelSelector(false)}
         maxModels={4}
+      />
+
+      <DebateSetupModal
+        isOpen={showDebateSetupModal}
+        models={usableDebateModels}
+        evaluationModels={usableDebateModels.map(m => m.name)}
+        onClose={() => setShowDebateSetupModal(false)}
+        onCreate={handleCreateDebate}
       />
 
       <Sidebar
@@ -1327,6 +1591,44 @@ export default function Home() {
                 searchQuery={noteSearchQuery}
               />
             </div>
+          ) : pathname === '/debates' ? (
+            currentDebate ? (
+              <DebateArenaView
+                debate={currentDebate}
+                messages={debateMessages}
+                evaluations={debateEvaluations}
+                debateState={debateState}
+                evaluating={evaluating}
+                availableEvaluationModels={availableEvaluationModels}
+                selectedEvaluationModelName={selectedEvaluationModelName}
+                onChangeEvaluationModel={handleChangeEvaluationModel}
+                onBack={handleBackToDebateList}
+                onStart={handleStartDebate}
+                onSendTurn={sendDebateTurn}
+                onModeratorMessage={sendModeratorMessage}
+                onComplete={handleCompleteDebate}
+                onEvaluate={handleEvaluateDebate}
+                onVote={voteForWinner}
+                onCancel={cancelTurn}
+                onDelete={() => handleRequestDeleteDebate(currentDebate)}
+              />
+            ) : (
+              <div className="max-w-6xl mx-auto w-full h-full">
+                <DebateList
+                  debates={debates}
+                  loading={loadingDebates}
+                  onSelectDebate={(debate) => {
+                    // Update URL so each debate has a unique, shareable URL
+                    if (pathname === '/debates') {
+                      router.push(`/debates?debateId=${debate.id}`)
+                    }
+                    loadDebate(debate.id)
+                  }}
+                  onCreateDebate={() => setShowDebateSetupModal(true)}
+                  onDeleteDebate={handleRequestDeleteDebate}
+                />
+              </div>
+            )
           ) : pathname === '/prompts' ? (
             <div className="max-w-4xl mx-auto w-full">
               <div className="mb-6 space-y-4">
@@ -1471,7 +1773,7 @@ export default function Home() {
 
 
 
-        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && pathname !== '/prompts' && (pathname !== '/news' || newsChatArticle) && !comparisonMode && (
+        {pathname !== '/files' && pathname !== '/stats' && pathname !== '/notes' && pathname !== '/models' && pathname !== '/prompts' && pathname !== '/debates' && (pathname !== '/news' || newsChatArticle) && !comparisonMode && (
           <MessageInput
             input={input}
             uploading={uploading}

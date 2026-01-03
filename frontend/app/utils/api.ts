@@ -346,5 +346,136 @@ export const api = {
       signal,
     })
   },
+
+  // Debate API methods
+  createDebate: async (request: {
+    creator_id: number
+    title: string
+    topic: string
+    participants: Array<{
+      model_name: string
+      position?: string
+      participant_order: number
+      color?: string
+    }>
+    config?: any
+  }): Promise<any> => {
+    const response = await axios.post(`${API_URL}/api/debates`, request)
+    return response.data
+  },
+
+  getUserDebates: async (userId: number, status?: string): Promise<any[]> => {
+    const url = status
+      ? `${API_URL}/api/debates/${userId}/list?status=${status}`
+      : `${API_URL}/api/debates/${userId}/list`
+    const response = await axios.get(url)
+    return response.data
+  },
+
+  getDebate: async (debateId: number): Promise<any> => {
+    const response = await axios.get(`${API_URL}/api/debates/${debateId}`)
+    return response.data
+  },
+
+  updateDebate: async (
+    debateId: number,
+    updates: {
+      title?: string
+      topic?: string
+      status?: string
+      winner_participant_id?: number
+    }
+  ): Promise<any> => {
+    const response = await axios.put(`${API_URL}/api/debates/${debateId}`, updates)
+    return response.data
+  },
+
+  startDebate: async (debateId: number): Promise<void> => {
+    await axios.post(`${API_URL}/api/debates/${debateId}/start`)
+  },
+
+  pauseDebate: async (debateId: number): Promise<void> => {
+    await axios.post(`${API_URL}/api/debates/${debateId}/pause`)
+  },
+
+  resumeDebate: async (debateId: number): Promise<void> => {
+    await axios.post(`${API_URL}/api/debates/${debateId}/resume`)
+  },
+
+  completeDebate: async (debateId: number): Promise<void> => {
+    await axios.post(`${API_URL}/api/debates/${debateId}/complete`)
+  },
+
+  getDebateMessages: async (
+    debateId: number,
+    roundNumber?: number
+  ): Promise<any[]> => {
+    const url = roundNumber !== undefined
+      ? `${API_URL}/api/debates/${debateId}/messages?round_number=${roundNumber}`
+      : `${API_URL}/api/debates/${debateId}/messages`
+    const response = await axios.get(url)
+    return response.data
+  },
+
+  sendDebateTurn: async (request: {
+    debate_session_id: number
+    participant_id: number
+    round_number: number
+    turn_number: number
+    moderator_prompt?: string
+  }, signal?: AbortSignal): Promise<Response> => {
+    return fetch(`${API_URL}/api/debates/${request.debate_session_id}/turn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+      signal,
+    })
+  },
+
+  sendModeratorMessage: async (
+    debateId: number,
+    content: string,
+    roundNumber: number
+  ): Promise<any> => {
+    const response = await axios.post(
+      `${API_URL}/api/debates/${debateId}/moderator`,
+      null,
+      { params: { content, round_number: roundNumber } }
+    )
+    return response.data
+  },
+
+  evaluateDebate: async (debateId: number, model?: string): Promise<void> => {
+    await axios.post(`${API_URL}/api/debates/${debateId}/evaluate`, null, {
+      params: model ? { model } : undefined,
+    })
+  },
+
+  getDebateEvaluations: async (debateId: number): Promise<any[]> => {
+    const response = await axios.get(`${API_URL}/api/debates/${debateId}/evaluations`)
+    return response.data
+  },
+
+  voteForWinner: async (request: {
+    debate_session_id: number
+    user_id: number
+    winner_participant_id: number
+    reasoning?: string
+  }): Promise<any> => {
+    const response = await axios.post(
+      `${API_URL}/api/debates/${request.debate_session_id}/vote`,
+      request
+    )
+    return response.data
+  },
+
+  getDebateVotes: async (debateId: number): Promise<any[]> => {
+    const response = await axios.get(`${API_URL}/api/debates/${debateId}/votes`)
+    return response.data
+  },
+
+  deleteDebate: async (debateId: number): Promise<void> => {
+    await axios.delete(`${API_URL}/api/debates/${debateId}`)
+  },
 }
 

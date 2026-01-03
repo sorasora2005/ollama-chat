@@ -48,27 +48,33 @@ class GrokProvider(CloudProviderBase):
         if not user:
             return {"error": "User not found"}
 
+        skip_history = getattr(request, "skip_history", False)
+
         session_id = request.session_id or str(uuid.uuid4())
-        repo = MessageRepository(db)
+        repo = MessageRepository(db) if not skip_history else None
 
         # Save user message
-        user_message = repo.save_user_message(
-            user_id=request.user_id,
-            session_id=session_id,
-            content=request.message,
-            model=request.model,
-            images=request.images
-        )
+        user_message = None
+        if not skip_history and repo is not None:
+            user_message = repo.save_user_message(
+                user_id=request.user_id,
+                session_id=session_id,
+                content=request.message,
+                model=request.model,
+                images=request.images
+            )
 
         try:
             # Build conversation history
             messages = []
-            history = repo.get_session_history(
-                user_id=request.user_id,
-                session_id=session_id,
-                exclude_message_id=user_message.id,
-                limit=20
-            )
+            history = []
+            if not skip_history and repo is not None and user_message is not None:
+                history = repo.get_session_history(
+                    user_id=request.user_id,
+                    session_id=session_id,
+                    exclude_message_id=user_message.id,
+                    limit=20
+                )
 
             # Format messages for xAI API (OpenAI compatible)
             for msg in history:
@@ -132,13 +138,15 @@ class GrokProvider(CloudProviderBase):
                     else:
                         error_message = f"xAI API error ({response.status_code}): {error_message}"
 
-                    repo.delete_message(user_message.id)
+                    if not skip_history and repo is not None and user_message is not None:
+                        repo.delete_message(user_message.id)
                     return {"error": error_message}
 
                 response_json = response.json()
 
                 if not response_json.get("choices"):
-                    repo.delete_message(user_message.id)
+                    if not skip_history and repo is not None and user_message is not None:
+                        repo.delete_message(user_message.id)
                     return {"error": "xAI API returned no content."}
 
                 choice = response_json["choices"][0]
@@ -150,21 +158,24 @@ class GrokProvider(CloudProviderBase):
                 completion_tokens = usage.get("completion_tokens")
 
                 # Save assistant message
-                assistant_msg = repo.save_assistant_message(
-                    user_id=request.user_id,
-                    session_id=session_id,
-                    content=full_message,
-                    model=request.model,
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens
-                )
+                assistant_msg = None
+                if not skip_history and repo is not None:
+                    assistant_msg = repo.save_assistant_message(
+                        user_id=request.user_id,
+                        session_id=session_id,
+                        content=full_message,
+                        model=request.model,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens
+                    )
 
                 response_data = {
                     "content": full_message,
                     "session_id": session_id,
-                    "message_id": assistant_msg.id,
                     "done": True,
                 }
+                if assistant_msg is not None:
+                    response_data["message_id"] = assistant_msg.id
                 if prompt_tokens is not None:
                     response_data["prompt_tokens"] = prompt_tokens
                 if completion_tokens is not None:
@@ -172,8 +183,10 @@ class GrokProvider(CloudProviderBase):
                 return response_data
 
         except httpx.TimeoutException:
-            repo.delete_message(user_message.id)
+            if not skip_history and repo is not None and user_message is not None:
+                repo.delete_message(user_message.id)
             return {"error": "Request timeout"}
         except Exception as e:
-            repo.delete_message(user_message.id)
+            if not skip_history and repo is not None and user_message is not None:
+                repo.delete_message(user_message.id)
             return {"error": f"An unexpected error occurred: {str(e)}"}

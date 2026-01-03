@@ -99,3 +99,79 @@ export interface PromptTemplate {
   updated_at: string
 }
 
+// Debate Types
+
+export interface DebateParticipant {
+  id: number
+  debate_session_id: number
+  model_name: string
+  position: string | null
+  participant_order: number
+  color: string | null
+  created_at: string
+}
+
+export interface DebateSession {
+  id: number
+  creator_id: number
+  title: string
+  topic: string
+  status: 'setup' | 'active' | 'paused' | 'completed'
+  config: {
+    max_rounds?: number
+    turn_timeout?: number
+    rules?: string
+  }
+  winner_participant_id: number | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+  participants: DebateParticipant[]
+}
+
+export interface DebateMessage {
+  id: number
+  debate_session_id: number
+  participant_id: number | null  // null = moderator
+  content: string
+  round_number: number
+  turn_number: number
+  message_type: 'argument' | 'moderator' | 'clarification' | 'rebuttal'
+  prompt_tokens: number | null
+  completion_tokens: number | null
+  response_time: number | null
+  created_at: string
+}
+
+export interface DebateEvaluation {
+  id: number
+  debate_session_id: number
+  participant_id: number
+  evaluator_model: string
+  qualitative_feedback: string | null
+  scores: {
+    clarity?: number
+    logic?: number
+    persuasiveness?: number
+    evidence?: number
+    overall?: number
+  } | null
+  created_at: string
+}
+
+export interface DebateVote {
+  id: number
+  debate_session_id: number
+  user_id: number
+  winner_participant_id: number
+  reasoning: string | null
+  created_at: string
+}
+
+export interface DebateState {
+  currentRound: number
+  currentTurn: number
+  isGenerating: boolean
+  currentParticipantId: number | null
+}
+

@@ -38,6 +38,8 @@ https://github.com/user-attachments/assets/b468ca8c-7c8d-48cc-b9c3-ee322ae3dce0
 - 🔄 **幅広いモデル対応** - Ollamaで利用可能なほぼすべてのモデルをサポート
 - ☁️ **クラウドAPI対応** - Gemini、GPT、Claude、GrokなどのクラウドモデルのAPIキーを登録して利用可能
 - 🔀 **AIモデル比較モード** - 最大4つのモデルを同時に比較、応答時間とトークン数をリアルタイム表示
+- ⚔️ **AIモデルディベート** - 複数モデルに立場を与えてターン制ディベートを実行
+- 🏅 **AIによるディベート評価** - 選択したモデルが各参加者を日本語で評価し、スコアリング
 - 📝 **ノート機能** - チャット内容やアイデアをノートとして保存・管理・検索
 - 👥 **マルチユーザー対応** - 複数のユーザーアカウント管理
 - 📁 **セッション管理** - チャットセッションの作成、削除、検索機能
@@ -187,6 +189,10 @@ start.bat
   - 各モデルの応答を個別にコピー・再生成可能
   - ローカルモデル（Ollama）とクラウドモデルの混在比較に対応
   - 画像対応モデルが1つでもない場合、ファイルアップロード機能を自動的に無効化
+- **AIモデルディベート**: `/debates` ページで、2〜4体のモデルにポジションを割り当ててラウンド制ディベートを実行
+  - モデレーターからの介入メッセージ送信に対応
+  - ディベート終了後、指定したモデル（GPT / Claude / Gemini / ローカルモデルなど）が日本語で詳細評価と5軸スコアリングを実施
+  - ユーザー自身による勝者投票と理由の記録が可能
 - **マルチページファイルビューア**:
   - PDF、DOCX、XLSXファイルの全ページをプレビュー
   - インライン表示で「前へ」「次へ」ボタンでページナビゲーション
@@ -215,6 +221,7 @@ start.bat
 - **TypeScript** - 型安全性
 - **Tailwind CSS** - スタイリング
 - **Axios** - HTTPクライアント
+- **date-fns** - 日付・時刻のフォーマットと相対時間表示（ディベート一覧など）
 - **Lucide React** - アイコンライブラリ
 - **react-markdown** - Markdownレンダリング
 - **react-syntax-highlighter** - コードブロックのシンタックスハイライト
@@ -335,6 +342,7 @@ start.bat
   - `useModels`: モデル一覧と選択管理
   - `useNotifications`: 通知（トースト）管理
   - `useTheme`: テーマ（ダーク/ライトモード）管理
+  - `useDebateManagement`: ディベートの作成・進行・評価管理
   - `useUsers`: ユーザー管理
 - **ユーティリティ**: APIクライアント、エクスポート、スクロールなどの共通処理（`utils/`）
 - **型定義**: TypeScript型定義を一元管理（`types/`）
@@ -422,6 +430,9 @@ ollama-chat/
 │   │   ├── models.py      # モデル管理エンドポイント
 │   │   ├── notes.py       # ノート管理エンドポイント
 │   │   ├── upload.py      # ファイルアップロードエンドポイント
+│   │   ├── news.py        # ニュース取得エンドポイント
+│   │   ├── prompts.py     # プロンプトテンプレート管理エンドポイント
+│   │   ├── debates.py     # ディベート管理エンドポイント
 │   │   └── users.py       # ユーザー管理エンドポイント
 │   ├── services/           # サービス層（ビジネスロジック）
 │   │   ├── chat_service.py      # チャット処理オーケストレーション
@@ -429,6 +440,8 @@ ollama-chat/
 │   │   ├── model_detector.py     # クラウドモデル検出
 │   │   ├── api_key_validator.py  # 統一API検証サービス
 │   │   ├── note_generator.py     # ノート生成サービス
+│   │   ├── debate_service.py     # ディベート進行サービス
+│   │   ├── debate_evaluator.py   # ディベート評価サービス
 │   │   └── cloud_providers/      # クラウドプロバイダー実装
 │   │       ├── base.py           # 抽象基底クラス
 │   │       ├── gemini.py         # Gemini API実装
@@ -470,6 +483,10 @@ ollama-chat/
 │   │   │   ├── SearchModal.tsx
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── StatsList.tsx
+│   │   │   ├── DebateArenaView.tsx      # ディベート画面
+│   │   │   ├── DebateList.tsx           # ディベート一覧
+│   │   │   ├── DebateSetupModal.tsx     # ディベート作成モーダル
+│   │   │   ├── DebateEvaluationPanel.tsx# ディベート評価表示
 │   │   │   ├── TopBar.tsx
 │   │   │   ├── UsernameModal.tsx
 │   │   │   └── WelcomeScreen.tsx
@@ -488,7 +505,8 @@ ollama-chat/
 │   │   │   ├── useModels.ts            # モデル一覧と選択
 │   │   │   ├── useNotifications.ts     # 通知管理
 │   │   │   ├── useTheme.ts             # テーマ管理
-│   │   │   └── useUsers.ts             # ユーザー管理
+│   │   │   ├── useUsers.ts             # ユーザー管理
+│   │   │   └── useDebateManagement.ts  # ディベート管理
 │   │   ├── utils/          # ユーティリティ関数
 │   │   │   ├── api.ts      # APIクライアント
 │   │   │   ├── logger.ts   # フロントエンドロガー
@@ -501,7 +519,9 @@ ollama-chat/
 │   │   │   └── page.tsx
 │   │   ├── notes/          # ノート管理ページ
 │   │   │   └── page.tsx
-│   │   └── stats/          # 統計情報ページ
+│   │   ├── stats/          # 統計情報ページ
+│   │   │   └── page.tsx
+│   │   └── debates/        # ディベートページ
 │   │       └── page.tsx
 │   ├── package.json        # Node.js依存関係
 │   ├── next.config.js      # Next.js設定

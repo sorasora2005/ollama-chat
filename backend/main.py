@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, engine, ensure_columns_exist
-from routers import models, users, chat, upload, feedback, notes, api_keys, scrape, news, prompts
+from routers import models, users, chat, upload, feedback, notes, api_keys, scrape, news, prompts, debates
 from logging_config import setup_logging, get_logger
 
 # Initialize logging
@@ -41,6 +41,7 @@ app.include_router(prompts.router)
 app.include_router(api_keys.router)
 app.include_router(scrape.router)
 app.include_router(news.router)
+app.include_router(debates.router)
 
 @app.get("/")
 async def root():

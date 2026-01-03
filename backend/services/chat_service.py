@@ -171,47 +171,51 @@ class ChatService:
             yield f"data: {json.dumps({'error': 'User not found'})}\n\n"
             return
 
+        skip_history = getattr(request, "skip_history", False)
+
         # Generate session_id if not provided
         session_id = request.session_id or str(uuid.uuid4())
 
-        # Check if this is a new chat
-        existing_messages_count = len(self.message_repo.get_session_history(
-            user_id=request.user_id,
-            session_id=session_id,
-            limit=1
-        ))
-        is_new_chat = existing_messages_count == 0
-
-        # Save user message
-        user_message = self.message_repo.save_user_message(
-            user_id=request.user_id,
-            session_id=session_id,
-            content=request.message,
-            model=request.model,
-            images=request.images
-        )
-
         # Prepare messages for Ollama
         messages = []
-        if not is_new_chat:
-            # Include history for existing chats
-            history = self.message_repo.get_session_history(
+
+        if not skip_history:
+            # Check if this is a new chat
+            existing_messages_count = len(self.message_repo.get_session_history(
                 user_id=request.user_id,
                 session_id=session_id,
-                exclude_message_id=user_message.id,
-                limit=20
+                limit=1
+            ))
+            is_new_chat = existing_messages_count == 0
+
+            # Save user message
+            user_message = self.message_repo.save_user_message(
+                user_id=request.user_id,
+                session_id=session_id,
+                content=request.message,
+                model=request.model,
+                images=request.images
             )
 
-            for msg in history:
-                msg_dict = {
-                    "role": msg.role,
-                    "content": msg.content
-                }
-                if msg.images and len(msg.images) > 0:
-                    msg_dict["images"] = msg.images
-                messages.append(msg_dict)
+            if not is_new_chat:
+                # Include history for existing chats
+                history = self.message_repo.get_session_history(
+                    user_id=request.user_id,
+                    session_id=session_id,
+                    exclude_message_id=user_message.id,
+                    limit=20
+                )
 
-        # Add current message
+                for msg in history:
+                    msg_dict = {
+                        "role": msg.role,
+                        "content": msg.content
+                    }
+                    if msg.images and len(msg.images) > 0:
+                        msg_dict["images"] = msg.images
+                    messages.append(msg_dict)
+
+        # Add current message (always sent to model)
         current_message = {
             "role": "user",
             "content": request.message
@@ -265,22 +269,25 @@ class ChatService:
                                     completion_tokens = chunk_data.get("eval_count")
 
                                 if chunk_data.get("done", False):
-                                    # Save assistant response
-                                    assistant_msg = self.message_repo.save_assistant_message(
-                                        user_id=request.user_id,
-                                        session_id=session_id,
-                                        content=full_message,
-                                        model=request.model,
-                                        prompt_tokens=prompt_tokens,
-                                        completion_tokens=completion_tokens
-                                    )
-                                    message_saved = True
-                                    # Include token counts in response
+                                    # Include token counts and session in response
                                     done_data = {
                                         'done': True,
-                                        'message_id': assistant_msg.id,
                                         'session_id': session_id
                                     }
+
+                                    if not skip_history:
+                                        # Save assistant response
+                                        assistant_msg = self.message_repo.save_assistant_message(
+                                            user_id=request.user_id,
+                                            session_id=session_id,
+                                            content=full_message,
+                                            model=request.model,
+                                            prompt_tokens=prompt_tokens,
+                                            completion_tokens=completion_tokens
+                                        )
+                                        message_saved = True
+                                        done_data['message_id'] = assistant_msg.id
+
                                     if prompt_tokens is not None:
                                         done_data['prompt_tokens'] = prompt_tokens
                                     if completion_tokens is not None:
@@ -292,7 +299,7 @@ class ChatService:
 
                     except (asyncio.CancelledError, ConnectionError):
                         was_cancelled = True
-                        if not message_saved:
+                        if not skip_history and not message_saved:
                             try:
                                 cancelled_content = full_message.strip() if full_message.strip() else "生成途中でキャンセルされました。"
                                 self.message_repo.save_assistant_message(
@@ -309,7 +316,7 @@ class ChatService:
 
         except (asyncio.CancelledError, ConnectionError):
             was_cancelled = True
-            if not message_saved:
+            if not skip_history and not message_saved:
                 try:
                     cancelled_content = full_message.strip() if full_message.strip() else "生成途中でキャンセルされました。"
                     self.message_repo.save_assistant_message(
@@ -331,8 +338,8 @@ class ChatService:
                 self.message_repo.delete_message(user_message.id)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
         finally:
-            # Save cancelled message if not already saved
-            if not message_saved and was_cancelled:
+            # Save cancelled message if not already saved (only when keeping history)
+            if not skip_history and not message_saved and was_cancelled:
                 try:
                     cancelled_content = full_message.strip() if full_message.strip() else "生成途中でキャンセルされました。"
                     self.message_repo.save_assistant_message(

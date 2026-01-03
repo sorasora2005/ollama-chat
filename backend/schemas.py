@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
     model: str = "qwen3-vl:4b"  # Default model
     session_id: Optional[str] = None  # Session ID for grouping conversations
     images: Optional[List[str]] = None  # Base64 encoded images
+    skip_history: bool = False  # If True, do not persist messages to chat history (used for debates etc.)
 
 class ChatResponse(BaseModel):
     message: str
@@ -126,4 +127,113 @@ class ChatWithTemplateRequest(BaseModel):
     model: str
     session_id: Optional[str] = None
     images: Optional[List[str]] = None
+
+# Debate Schemas
+
+class DebateParticipantCreate(BaseModel):
+    model_name: str
+    position: Optional[str] = None
+    participant_order: int
+    color: Optional[str] = None
+
+class DebateParticipantResponse(BaseModel):
+    id: int
+    debate_session_id: int
+    model_name: str
+    position: Optional[str]
+    participant_order: int
+    color: Optional[str]
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+class DebateSessionCreate(BaseModel):
+    creator_id: int
+    title: str
+    topic: str
+    participants: List[DebateParticipantCreate]
+    config: Optional[Dict[str, Any]] = {}
+
+class DebateSessionUpdate(BaseModel):
+    title: Optional[str] = None
+    topic: Optional[str] = None
+    status: Optional[str] = None
+    winner_participant_id: Optional[int] = None
+
+class DebateSessionResponse(BaseModel):
+    id: int
+    creator_id: int
+    title: str
+    topic: str
+    status: str
+    config: Optional[Dict[str, Any]]
+    winner_participant_id: Optional[int]
+    created_at: str
+    updated_at: str
+    completed_at: Optional[str]
+    participants: List[DebateParticipantResponse]
+
+    class Config:
+        from_attributes = True
+
+class DebateMessageCreate(BaseModel):
+    debate_session_id: int
+    participant_id: Optional[int] = None
+    content: str
+    round_number: int
+    turn_number: int
+    message_type: str = 'argument'
+
+class DebateMessageResponse(BaseModel):
+    id: int
+    debate_session_id: int
+    participant_id: Optional[int]
+    content: str
+    round_number: int
+    turn_number: int
+    message_type: str
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+    response_time: Optional[float]
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+class DebateTurnRequest(BaseModel):
+    debate_session_id: int
+    participant_id: int
+    round_number: int
+    turn_number: int
+    moderator_prompt: Optional[str] = None
+
+class DebateEvaluationResponse(BaseModel):
+    id: int
+    debate_session_id: int
+    participant_id: int
+    evaluator_model: str
+    qualitative_feedback: Optional[str]
+    scores: Optional[Dict[str, Any]]
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+class DebateVoteCreate(BaseModel):
+    debate_session_id: int
+    user_id: int
+    winner_participant_id: int
+    reasoning: Optional[str] = None
+
+class DebateVoteResponse(BaseModel):
+    id: int
+    debate_session_id: int
+    user_id: int
+    winner_participant_id: int
+    reasoning: Optional[str]
+    created_at: str
+
+    class Config:
+        from_attributes = True
 
