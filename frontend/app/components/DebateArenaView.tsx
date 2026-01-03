@@ -310,7 +310,7 @@ export default function DebateArenaView({
             <CheckCircle className="w-4 h-4 mt-0.5" />
             <div className="space-y-1">
               <span>
-                このディベートは完了しました。下部のAI評価や投票結果を確認できます。
+                このディベートは完了しました。
               </span>
               {winnerParticipant && (
                 <span>

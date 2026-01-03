@@ -6,7 +6,14 @@ from typing import Optional
 from datetime import datetime
 
 from database import get_db
-from models import User, ChatMessage, MessageFeedback
+from models import (
+    User,
+    ChatMessage,
+    MessageFeedback,
+    DebateMessage,
+    DebateSession,
+    DebateParticipant,
+)
 from schemas import FeedbackCreate
 
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
@@ -68,27 +75,41 @@ async def get_feedback_stats(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Base query for filtering by user
-    base_query = db.query(ChatMessage).filter(ChatMessage.user_id == user_id)
-    
-    # Filter by model if provided
-    if model:
-        base_query = base_query.filter(ChatMessage.model == model)
-    
-    # Get message counts per model
+    # --- Chat messages (通常チャット) の集計 ---
     message_counts = db.query(
         ChatMessage.model,
         func.count(ChatMessage.id).label("total_messages"),
         func.sum(func.coalesce(ChatMessage.prompt_tokens, 0)).label("total_prompt_tokens"),
-        func.sum(func.coalesce(ChatMessage.completion_tokens, 0)).label("total_completion_tokens")
+        func.sum(func.coalesce(ChatMessage.completion_tokens, 0)).label("total_completion_tokens"),
     ).filter(
         ChatMessage.user_id == user_id
     )
-    
+
     if model:
         message_counts = message_counts.filter(ChatMessage.model == model)
-    
+
     message_counts = message_counts.group_by(ChatMessage.model).all()
+
+    # --- Debate messages (ディベート) の集計 ---
+    # DebateSession.creator_id が user_id のものを、そのディベート内の
+    # 各参加者モデルごとにトークン数・メッセージ数を集計する。
+    debate_counts = db.query(
+        DebateParticipant.model_name.label("model"),
+        func.count(DebateMessage.id).label("total_messages"),
+        func.sum(func.coalesce(DebateMessage.prompt_tokens, 0)).label("total_prompt_tokens"),
+        func.sum(func.coalesce(DebateMessage.completion_tokens, 0)).label("total_completion_tokens"),
+    ).join(
+        DebateSession, DebateSession.id == DebateMessage.debate_session_id
+    ).join(
+        DebateParticipant, DebateParticipant.id == DebateMessage.participant_id
+    ).filter(
+        DebateSession.creator_id == user_id
+    )
+
+    if model:
+        debate_counts = debate_counts.filter(DebateParticipant.model_name == model)
+
+    debate_counts = debate_counts.group_by(DebateParticipant.model_name).all()
     
     # Get feedback counts per model
     feedback_query = db.query(
@@ -115,21 +136,52 @@ async def get_feedback_stats(
             feedback_by_model[model_name] = {"positive": 0, "negative": 0}
         feedback_by_model[model_name][fb.feedback_type] = fb.count
     
-    # Combine results
-    stats = []
+    # Combine chat + debate stats per model
+    aggregated = {}
+
+    # 通常チャット分
     for msg_stat in message_counts:
         model_name = msg_stat.model
+        if model_name not in aggregated:
+            aggregated[model_name] = {
+                "total_messages": 0,
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+            }
+        aggregated[model_name]["total_messages"] += msg_stat.total_messages or 0
+        aggregated[model_name]["total_prompt_tokens"] += msg_stat.total_prompt_tokens or 0
+        aggregated[model_name]["total_completion_tokens"] += msg_stat.total_completion_tokens or 0
+
+    # ディベート分
+    for debate_stat in debate_counts:
+        model_name = debate_stat.model
+        if model_name not in aggregated:
+            aggregated[model_name] = {
+                "total_messages": 0,
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+            }
+        aggregated[model_name]["total_messages"] += debate_stat.total_messages or 0
+        aggregated[model_name]["total_prompt_tokens"] += debate_stat.total_prompt_tokens or 0
+        aggregated[model_name]["total_completion_tokens"] += debate_stat.total_completion_tokens or 0
+
+    # 最終レスポンス用に配列へ整形
+    stats = []
+    for model_name, totals in aggregated.items():
         feedback_stats = feedback_by_model.get(model_name, {"positive": 0, "negative": 0})
-        
+
+        total_prompt = totals["total_prompt_tokens"] or 0
+        total_completion = totals["total_completion_tokens"] or 0
+
         stats.append({
             "model": model_name,
-            "total_messages": msg_stat.total_messages,
-            "total_prompt_tokens": msg_stat.total_prompt_tokens or 0,
-            "total_completion_tokens": msg_stat.total_completion_tokens or 0,
-            "total_tokens": (msg_stat.total_prompt_tokens or 0) + (msg_stat.total_completion_tokens or 0),
+            "total_messages": totals["total_messages"],
+            "total_prompt_tokens": total_prompt,
+            "total_completion_tokens": total_completion,
+            "total_tokens": total_prompt + total_completion,
             "positive_feedback_count": feedback_stats["positive"],
             "negative_feedback_count": feedback_stats["negative"],
-            "total_feedback_count": feedback_stats["positive"] + feedback_stats["negative"]
+            "total_feedback_count": feedback_stats["positive"] + feedback_stats["negative"],
         })
     
     # If filtering by model and no stats found, return empty stats for that model
